@@ -27,6 +27,10 @@ pl_list = [
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 selected_db = st.selectbox("Database:", db_list)
 tujuan = st.text_input("Tujuan Pengiriman:")
+tanggal_pengiriman = st.date_input(
+    "Select a date:",
+    value=date.today()
+)
 nomor_pl = st.multiselect("Nomor Pick List Terkirim:", pl_list)
 
 st.write("This is a placeholder for the Packing module.")
