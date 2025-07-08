@@ -44,6 +44,7 @@ pic_list = [
 ]
 
 # --- UI ---
+st.set_page_config(page_title="Inbound Monitoring", layout="wide")
 st.title("Inbound Monitoring Form")
 
 df_master, database_data = load_po_data()
