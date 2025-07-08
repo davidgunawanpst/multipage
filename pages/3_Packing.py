@@ -20,7 +20,8 @@ db_list = [
 ]
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 selected_db = st.selectbox("Database:", db_list)
-nomor_pl = st.number_input("Nomor Pick List:", step=1)
+nomor_pl = st.number_input("Nomor Pick List:", min_value=0, step=1)
+uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
 
 st.write("This is a placeholder for the Packing module.")
