@@ -20,7 +20,7 @@ db_list = [
 ]
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 selected_db = st.selectbox("Database:", db_list)
-nomor_pl = st.number_input("Nomor Pick List:")
+nomor_pl = st.number_input("Nomor Pick List:", step=1)
 
 
 st.write("This is a placeholder for the Packing module.")
