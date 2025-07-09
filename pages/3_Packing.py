@@ -1,55 +1,46 @@
-import streamlit as st
-import requests
-from datetime import datetime
-import base64
-
-st.set_page_config(page_title="Packing", layout="wide")
-st.title("Packing")
-
-# --- CONFIGURE GOOGLE SHEET SOURCE ---
-SHEET_ID = "1viV03CJxPsK42zZyKI6ZfaXlLR62IbC0O3Lbi_hfGRo"
-SHEET_NAME = "PL"
-CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
-
-# Load PL Data from Google Sheet
+# Load CSV from Google Sheets
 @st.cache_data
-def load_pl_data():
-    df= pd.read_csv(CSV_URL)
-    #Build Dictionary
-    pl_dict = {}
-    for _,row in df.iterrows():
-        db = row['Nama Perusahaan']
-        pl = str(row['Pick Number'])
-        item=
-        if db not in pl_dict:
-            pl_dict[db]={}
-        if pl not in pl_dict[db]:
-            pl_dict[db][pl] = []
-    return df,pl_dict             
+def load_data():
+    return pd.read_csv(CSV_URL)
 
-# 1. PIC Name
+df = load_data()
+
+# Handle column renaming if needed
+df.columns = df.columns.str.strip()
+if "Nama Perusahaan" not in df.columns or "Pick Number" not in df.columns:
+    st.error("❌ Required columns not found in the sheet!")
+    st.stop()
+
+# Set page config and title
+st.set_page_config(page_title="Packing", layout="wide")
+st.title("📦 Packing Module")
+
+# 1. PIC Name (Static)
 pic_list = [
     "Rikie Dwi Permana", "Idha Akhmad Sucahyo", "Rian Dinata",
     "Harimurti Krisandki", "Muchamad Mustofa", "Yogie Arie Wibowo"
 ]
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
-database_data = load_po_data()
-df_master = load_po_data()
-# 2. Database (temporary static, later populated via Apps Script if needed)
-selected_db = st.selectbox("Select Database:", list(database_data.keys())
-# 3. Pick List Number
-selected_po = st.selectbox("Select PL Number:", list(dataabse_data[selected_db].keys()))
-# 4. Upload Photos
+
+# 2. Database (Nama Perusahaan)
+db_options = sorted(df["Nama Perusahaan"].dropna().unique())
+selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
+
+# 3. Pick List (filtered)
+filtered_df = df[df["Nama Perusahaan"] == selected_db]
+pl_options = sorted(filtered_df["Pick Number"].dropna().unique())
+selected_pl = st.selectbox("Pick List Number:", pl_options)
+
+# 4. Upload Pictures
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
-# 5. Packed Button
+# 5. Submit Button
 if st.button("✅ Packed"):
-    if not pick_list:
-        st.warning("Please enter a Pick List Number.")
+    if not selected_pl:
+        st.warning("Please select a Pick List Number.")
     elif not uploaded_files:
         st.warning("Please upload at least one photo.")
     else:
-        # Prepare data
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         images_base64 = []
 
@@ -64,17 +55,17 @@ if st.button("✅ Packed"):
             "timestamp": timestamp,
             "database": selected_db,
             "pic": selected_pic,
-            "pick_list": pick_list,
+            "pick_list": selected_pl,
             "photos": images_base64
         }
 
-        # Send to Apps Script Web App
+        # Replace with your actual Apps Script Webhook URL
         webhook_url = "https://script.google.com/macros/s/YOUR_WEBAPP_ID/exec"
         response = requests.post(webhook_url, json=payload)
 
         if response.status_code == 200:
             result = response.json()
-            st.success("Packed data submitted successfully!")
+            st.success("✅ Packed data submitted successfully!")
             st.markdown(f"📁 [View uploaded folder]({result.get('drive_folder_url')})")
         else:
-            st.error(f"Failed to submit data. Error: {response.text}")
+            st.error(f"❌ Failed to submit data. Error: {response.text}")
