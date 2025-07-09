@@ -2,81 +2,127 @@ import streamlit as st
 import pandas as pd
 import requests
 from datetime import datetime
+from zoneinfo import ZoneInfo
 import base64
 
-# CSV source
+# --- CONFIGURE GOOGLE SHEET SOURCE ---
 SHEET_ID = "1viV03CJxPsK42zZyKI6ZfaXlLR62IbC0O3Lbi_hfGRo"
 SHEET_NAME = "PL"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
-# Load CSV from Google Sheets
+# --- WEBHOOK URLs ---
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbyIdpYOoWIPHyHTgHPZr5oIFC7gz1kOe-4QigR_jhnRQ_S81HhUff8IFkFnHsabm0298w/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyIdpYOoWIPHyHTgHPZr5oIFC7gz1kOe-4QigR_jhnRQ_S81HhUff8IFkFnHsabm0298w/exec"
+
+# --- Load data ---
 @st.cache_data
-def load_data():
-    return pd.read_csv(CSV_URL)
+def load_packing_data():
+    df = pd.read_csv(CSV_URL)
+    df.columns = df.columns.str.strip()
+    return df
 
-df = load_data()
+# --- Static PIC Dropdown ---
+pic_list = [
+    "Rikie Dwi Permana",
+    "Idha Akhmad Sucahyo",
+    "Rian Dinata",
+    "Harimurti Krisandki",
+    "Muchamad Mustofa",
+    "Yogie Arie Wibowo"
+]
 
-# Handle column renaming if needed
-df.columns = df.columns.str.strip()
-if "Nama Perusahaan" not in df.columns or "Pick Number" not in df.columns:
-    st.error("❌ Required columns not found in the sheet!")
-    st.stop()
-
-# Set page config and title
+# --- UI ---
 st.set_page_config(page_title="Packing", layout="wide")
 st.title("📦 Packing Module")
 
-# 1. PIC Name (Static)
-pic_list = [
-    "Rikie Dwi Permana", "Idha Akhmad Sucahyo", "Rian Dinata",
-    "Harimurti Krisandki", "Muchamad Mustofa", "Yogie Arie Wibowo"
-]
+df = load_packing_data()
+
+# --- Check required columns ---
+if "Nama Perusahaan" not in df.columns or "Pick Number" not in df.columns:
+    st.error("❌ Required columns not found in the Google Sheet!")
+    st.stop()
+
+# --- Dropdowns ---
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 
-# 2. Database (Nama Perusahaan)
 db_options = sorted(df["Nama Perusahaan"].dropna().unique())
 selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
 
-# 3. Pick List (filtered)
 filtered_df = df[df["Nama Perusahaan"] == selected_db]
 pl_options = sorted(filtered_df["Pick Number"].dropna().unique())
 selected_pl = st.selectbox("Pick List Number:", pl_options)
 
-# 4. Upload Pictures
+# --- Upload Proof Photos ---
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
-# 5. Submit Button
+# --- Submit Button ---
 if st.button("✅ Packed"):
     if not selected_pl:
         st.warning("Please select a Pick List Number.")
     elif not uploaded_files:
         st.warning("Please upload at least one photo.")
     else:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        images_base64 = []
+        timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
+        folder_name = f"Packing_{selected_db}_{selected_pl}_{timestamp}"
 
-        for file in uploaded_files:
-            b64 = base64.b64encode(file.read()).decode()
-            images_base64.append({
-                "filename": file.name,
-                "content": b64
-            })
+        # --- Step 1: Upload Photos ---
+        photo_payload = {
+            "folder_name": folder_name,
+            "images": [
+                {
+                    "filename": file.name,
+                    "content": base64.b64encode(file.read()).decode("utf-8")
+                }
+                for file in uploaded_files
+            ]
+        }
 
-        payload = {
+        drive_folder_url = "UPLOAD_FAILED"
+        photo_success = False
+
+        try:
+            photo_response = requests.post(WEBHOOK_URL_PHOTO, json=photo_payload)
+            if photo_response.status_code == 200:
+                try:
+                    json_resp = photo_response.json()
+                    drive_folder_url = json_resp.get("folderUrl", "UPLOAD_FAILED")
+                    st.success("✅ Photos uploaded successfully.")
+                    st.markdown(f"[📂 View uploaded folder]({drive_folder_url})")
+                    photo_success = True
+                except Exception as e:
+                    st.error(f"❌ Failed to parse photo upload response: {e}")
+            else:
+                st.error(f"❌ Photo upload failed: {photo_response.status_code} - {photo_response.text}")
+        except Exception as e:
+            st.error(f"❌ Photo upload error: {e}")
+
+        # --- Step 2: Send Metadata ---
+        data_payload = {
             "timestamp": timestamp,
             "database": selected_db,
             "pic": selected_pic,
             "pick_list": selected_pl,
-            "photos": images_base64
+            "done_packing": "Yes",
+            "drive_folder_link": drive_folder_url
         }
 
-        # Replace with your actual Apps Script Webhook URL
-        webhook_url = "https://script.google.com/macros/s/YOUR_WEBAPP_ID/exec"
-        response = requests.post(webhook_url, json=payload)
+        data_success = False
+        try:
+            data_response = requests.post(WEBHOOK_URL_DATA, json=data_payload)
+            if data_response.status_code == 200:
+                st.success("✅ Data logged successfully.")
+                data_success = True
+            else:
+                st.error(f"❌ Data logging failed: {data_response.status_code} - {data_response.text}")
+        except Exception as e:
+            st.error(f"❌ Logging error: {e}")
 
-        if response.status_code == 200:
-            result = response.json()
-            st.success("✅ Packed data submitted successfully!")
-            st.markdown(f"📁 [View uploaded folder]({result.get('drive_folder_url')})")
-        else:
-            st.error(f"❌ Failed to submit data. Error: {response.text}")
+        # --- Final Status ---
+        if photo_success and data_success:
+            st.success("🎉 Packing submission completed successfully!")
+        elif not photo_success and not data_success:
+            st.error("🚨 Submission failed for both photo and data.")
+        elif not photo_success:
+            st.warning("⚠️ Data logged, but photo upload failed.")
+        elif not data_success:
+            st.warning("⚠️ Photos uploaded, but data logging failed.")
