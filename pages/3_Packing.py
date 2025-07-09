@@ -101,7 +101,7 @@ if st.button("✅ Packed"):
             "timestamp": timestamp,
             "database": selected_db,
             "pic": selected_pic,
-            "pick_list": selected_pl,
+            "pick_list": str(selected_pl),
             "done_packing": "Yes",
             "drive_folder_link": drive_folder_url
         }
