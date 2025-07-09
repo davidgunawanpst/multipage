@@ -1,3 +1,14 @@
+import streamlit as st
+import pandas as pd
+import requests
+from datetime import datetime
+import base64
+
+# CSV source
+SHEET_ID = "1viV03CJxPsK42zZyKI6ZfaXlLR62IbC0O3Lbi_hfGRo"
+SHEET_NAME = "PL"
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+
 # Load CSV from Google Sheets
 @st.cache_data
 def load_data():
