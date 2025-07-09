@@ -4,7 +4,28 @@ from datetime import datetime
 import base64
 
 st.set_page_config(page_title="Packing", layout="wide")
-st.title("📦 Packing Module")
+st.title("Packing")
+
+# --- CONFIGURE GOOGLE SHEET SOURCE ---
+SHEET_ID = "1viV03CJxPsK42zZyKI6ZfaXlLR62IbC0O3Lbi_hfGRo"
+SHEET_NAME = "PL"
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+
+# Load PL Data from Google Sheet
+@st.cache_data
+def load_pl_data():
+    df= pd.read_csv(CSV_URL)
+    #Build Dictionary
+    pl_dict = {}
+    for _,row in df.iterrows():
+        db = row['Nama Perusahaan']
+        pl = str(row['Pick Number'])
+        item=
+        if db not in pl_dict:
+            pl_dict[db]={}
+        if pl not in pl_dict[db]:
+            pl_dict[db][pl] = []
+    return df,pl_dict             
 
 # 1. PIC Name
 pic_list = [
