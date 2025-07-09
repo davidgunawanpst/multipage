@@ -33,13 +33,12 @@ pic_list = [
     "Harimurti Krisandki", "Muchamad Mustofa", "Yogie Arie Wibowo"
 ]
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
-
+database_data = load_po_data()
+df_master = load_po_data()
 # 2. Database (temporary static, later populated via Apps Script if needed)
-selected_db = st.selectbox("Database:", ["DMI", "PKS", "PMT", "PSM", "PSS", "PST"])
-
+selected_db = st.selectbox("Select Database:", list(database_data.keys())
 # 3. Pick List Number
-pick_list = st.text_input("Pick List Number (type or paste):")
-
+selected_po = st.selectbox("Select PL Number:", list(dataabse_data[selected_db].keys()))
 # 4. Upload Photos
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
