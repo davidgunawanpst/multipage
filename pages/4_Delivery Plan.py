@@ -13,6 +13,7 @@ pic_list = [
 db_list = [
     "DMI",
     "PKS",
+    "PBN",
     "PMT",
     "PSM",
     "PSS",
