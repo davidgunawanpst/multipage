@@ -21,9 +21,13 @@ pic_list = [
 receive_types = ["Turunan Kapal", "Servis", "Receive no PO"]
 
 db_list = [
-    "Database A",
-    "Database B",
-    "Database C"
+    "DMI",
+    "PBN",
+    "PKS",
+    "PMT",
+    "PSS",
+    "PSM",
+    "PST"
 ]
 
 # --- UI ---
