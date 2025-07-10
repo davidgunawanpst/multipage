@@ -87,7 +87,7 @@ if st.button("✅ Submit"):
         st.warning("Please upload at least one photo.")
     else:
         timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
-        folder_name = f"Packing_{selected_db}_{timestamp}"
+        folder_name = f"Outbound_{selected_db}_{selected_pl}"
 
         # Step 1: Upload Photos
         photo_payload = {
