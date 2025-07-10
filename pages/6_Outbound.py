@@ -22,8 +22,8 @@ def load_packing_data():
     return df
 
 # --- UI ---
-st.set_page_config(page_title="📦 Packing Module", layout="wide")
-st.title("📦 Packing Module")
+st.set_page_config(page_title="Outbound", layout="wide")
+st.title("Outbound")
 
 df = load_packing_data()
 
