@@ -5,8 +5,8 @@ from zoneinfo import ZoneInfo
 import base64
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbyzHRQMOAdL7EwKQ-4n-JwBZHIHAXly0DXMJksNV-HrqusaIoExyN6m8hTKIu1STGjZ-A/exec"
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyzHRQMOAdL7EwKQ-4n-JwBZHIHAXly0DXMJksNV-HrqusaIoExyN6m8hTKIu1STGjZ-A/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbyFZGqnQ0Z8lTP1Rp-xP8Y4sGIo6kYdi58msQ4W6_Dv4YNyx6LhVwZWaoBJnyn11G6JWw/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyFZGqnQ0Z8lTP1Rp-xP8Y4sGIo6kYdi58msQ4W6_Dv4YNyx6LhVwZWaoBJnyn11G6JWw/exec"
 
 # --- Static lists ---
 pic_list = [
