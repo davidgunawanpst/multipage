@@ -33,7 +33,7 @@ tujuan = st.text_input("Tujuan")
 nomor_matrix = st.text_input("Nomor Matrix")
 nomor_po = st.text_input("Nomor PO")
 
-db_options = ["DMI","PKS","PBN","PMT","PSM","PSS","PST"]
+db_options = sorted(df["Nama Perusahaan"].dropna().astype(str).str.strip().unique())
 selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
 
 # Filter PL numbers based on selected_db
