@@ -67,7 +67,9 @@ for i in range(jumlah_plastik):
     berat = st.text_input(f"Berat Plastik #{i+1}")
     dimensi = st.text_input(f"Dimensi Plastik #{i+1}")
     plastik_details.append({"berat": berat, "dimensi": dimensi})
-
+jumlah_peti = int(jumlah_peti)
+jumlah_dus = int(jumlah_dus)
+jumlah_plastik = int(jumlah_plastik)
 # --- Upload Proof Photos ---
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
