@@ -77,11 +77,35 @@ selected_items = st.multiselect("Select items received:", item_options)
 entry_data = {}
 for item in selected_items:
     st.markdown(f"### Entry for: `{item}`")
+    
+    # Lookup Quantity PO from filtered_df
+    item_row = filtered_df[filtered_df['Item Name Complete'] == item]
+    if not item_row.empty:
+        max_qty = int(item_row['Quantity PO'].iloc[0])
+    else:
+        max_qty = None  # fallback if not found
+
     col1, col2 = st.columns(2)
     with col1:
-        qty = st.number_input(f"Quantity for `{item}`", min_value=0, step=1, key=f"qty_{item}")
+        if max_qty is not None:
+            qty = st.number_input(
+                f"Quantity for `{item}`",
+                min_value=1,
+                max_value=max_qty,
+                step=1,
+                key=f"qty_{item}"
+            )
+        else:
+            st.warning(f"⚠️ Max quantity for `{item}` not found in PO data.")
+            qty = st.number_input(
+                f"Quantity for `{item}`",
+                min_value=1,
+                step=1,
+                key=f"qty_{item}"
+            )
     with col2:
         vessel = st.selectbox(f"Vessel for `{item}`", vessel_options, key=f"vessel_{item}")
+    
     entry_data[item] = {
         "quantity": qty,
         "vessel": vessel
