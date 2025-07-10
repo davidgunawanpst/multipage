@@ -39,7 +39,9 @@ selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
 # Filter PL numbers based on selected_db
 filtered_df = df[df["Nama Perusahaan"] == selected_db]
 pl_list = sorted(filtered_df["Pick Number"].dropna().unique())
+
 selected_pl = st.multiselect("Nomor Pick List:", pl_list)
+selected_pl = [str(pl) for pl in selected_pl]
 
 # --- Peti ---
 jumlah_peti = st.number_input("Jumlah Peti", min_value=0, step=1)
