@@ -31,13 +31,13 @@ db_list = [
 ]
 
 # --- UI ---
-st.set_page_config(page_title="📦 Packing Lite", layout="wide")
-st.title("📦 Packing Module (Lite)")
+st.set_page_config(page_title="Manual Receive", layout="wide")
+st.title("Manual Receive")
 
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 selected_receive_type = st.selectbox("Type of Receive:", receive_types)
 selected_db = st.selectbox("Database:", db_list)
-remarks = st.text_input("Remarks (optional):")
+remarks = st.text_input("Remarks (required):")
 
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
 
@@ -45,6 +45,8 @@ uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_
 if st.button("✅ Submit"):
     if not selected_receive_type:
         st.warning("Please select a type of receive.")
+    elif not remarks.strip():
+        st.warning("Remarks field is required. Please enter remarks.")
     elif not uploaded_files:
         st.warning("Please upload at least one photo.")
     else:
