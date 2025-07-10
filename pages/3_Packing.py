@@ -45,12 +45,10 @@ if "Nama Perusahaan" not in df.columns or "Pick Number" not in df.columns:
 # --- Dropdowns ---
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 
-db_options = sorted(df["Nama Perusahaan"].dropna().unique())
+db_options = ["DMI","PKS","PMT","PSM","PSS","PST"]
 selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
 
-filtered_df = df[df["Nama Perusahaan"] == selected_db]
-pl_options = sorted(filtered_df["Pick Number"].dropna().unique())
-selected_pl = st.selectbox("Pick List Number:", pl_options)
+selected_pl = st.text_input("Pick List Number:")
 
 # --- Upload Proof Photos ---
 uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_files=True, type=["jpg", "jpeg", "png"])
