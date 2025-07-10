@@ -28,4 +28,6 @@ pl_list = [
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 selected_db = st.selectbox("Database:", db_list)
 tujuan = st.text_input("Tujuan Pengiriman:")
+nomor_matrix = st.num_input("Nomor Matrix Approval Pengiriman:")
+nomor_PO = st.num_input("Nomor PO Pengiriman:")
 nomor_pl = st.multiselect("Nomor Pick List Terkirim:", pl_list)
