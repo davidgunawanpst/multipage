@@ -48,8 +48,8 @@ jumlah_peti = st.number_input("Jumlah Peti", min_value=0, step=1)
 peti_details = []
 for i in range(jumlah_peti):
     st.markdown(f"**Detail Peti #{i+1}**")
-    berat = st.text_input(f"Berat Peti #{i+1}")
-    dimensi = st.text_input(f"Dimensi Peti #{i+1}")
+    berat = st.text_input(f"Berat Peti #{i+1} (Kg)")
+    dimensi = st.text_input(f"Dimensi Peti #{i+1} (CBM)")
     peti_details.append({"berat": berat, "dimensi": dimensi})
 
 # --- Dus ---
@@ -57,8 +57,8 @@ jumlah_dus = st.number_input("Jumlah Dus", min_value=0, step=1)
 dus_details = []
 for i in range(jumlah_dus):
     st.markdown(f"**Detail Dus #{i+1}**")
-    berat = st.text_input(f"Berat Dus #{i+1}")
-    dimensi = st.text_input(f"Dimensi Dus #{i+1}")
+    berat = st.text_input(f"Berat Dus #{i+1} (Kg)")
+    dimensi = st.text_input(f"Dimensi Dus #{i+1} (CBM)")
     dus_details.append({"berat": berat, "dimensi": dimensi})
 
 # --- Plastik ---
@@ -66,8 +66,8 @@ jumlah_plastik = st.number_input("Jumlah Plastik", min_value=0, step=1)
 plastik_details = []
 for i in range(jumlah_plastik):
     st.markdown(f"**Detail Plastik #{i+1}**")
-    berat = st.text_input(f"Berat Plastik #{i+1}")
-    dimensi = st.text_input(f"Dimensi Plastik #{i+1}")
+    berat = st.text_input(f"Berat Plastik #{i+1} (Kg)")
+    dimensi = st.text_input(f"Dimensi Plastik #{i+1} (CBM)")
     plastik_details.append({"berat": berat, "dimensi": dimensi})
 jumlah_peti = int(jumlah_peti)
 jumlah_dus = int(jumlah_dus)
