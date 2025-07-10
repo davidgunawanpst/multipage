@@ -45,7 +45,7 @@ if "Nama Perusahaan" not in df.columns or "Pick Number" not in df.columns:
 # --- Dropdowns ---
 selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
 
-db_options = ["DMI","PKS","PMT","PSM","PSS","PST"]
+db_options = ["DMI","PKS","PBN","PMT","PSM","PSS","PST"]
 selected_db = st.selectbox("Database (Nama Perusahaan):", db_options)
 
 selected_pl = st.text_input("Pick List Number:")
