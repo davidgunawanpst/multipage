@@ -4,6 +4,7 @@ import requests
 from datetime import datetime
 from zoneinfo import ZoneInfo
 import base64
+from collections import Counter  # NEW
 
 # --- CONFIGURE GOOGLE SHEET SOURCE ---
 SHEET_ID = "1viV03CJxPsK42zZyKI6ZfaXlLR62IbC0O3Lbi_hfGRo"
@@ -18,8 +19,6 @@ WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbzU8ymaN7CaQMevzbkVH
 @st.cache_data
 def load_po_data():
     df = pd.read_csv(CSV_URL)
-
-    # Build dictionary {Database: {PO Number: [Items]}}
     po_dict = {}
     for _, row in df.iterrows():
         db = row['Nama Perusahaan']
@@ -30,7 +29,6 @@ def load_po_data():
         if po not in po_dict[db]:
             po_dict[db][po] = []
         po_dict[db][po].append(item)
-
     return df, po_dict
 
 # --- Fixed PIC Dropdown ---
@@ -58,55 +56,65 @@ filtered_df = df_master[
     (df_master['Nama Perusahaan'] == selected_db) &
     (df_master['PO Number'].astype(str) == selected_po)
 ]
-
 selected_po_pic = filtered_df['User Created PO'].iloc[0] if not filtered_df.empty else "-"
 po_vendor = filtered_df['Vendor'].iloc[0] if not filtered_df.empty else "-"
-
 st.markdown(f"**📌 PIC PO (From Source):** {selected_po_pic}")
 st.markdown(f"**🏢 Vendor:** {po_vendor}")
 
-# --- Get Vessel Options (Cost Center Nama Kapal) ---
-vessel_options = sorted(
-    filtered_df['Cost Center Nama Kapal'].dropna().unique()
-)
+# --- Get Vessel Options ---
+vessel_options = sorted(filtered_df['Cost Center Nama Kapal'].dropna().unique())
 
 # --- Item, Quantity, and Vessel Input ---
-item_options = filtered_df['Item Name Complete'].dropna().tolist()
-selected_items = st.multiselect("Select items received:", item_options)
+raw_item_list = filtered_df['Item Name Complete'].dropna().tolist()
+item_counter = Counter()
+item_options = []
+item_map = {}  # unique label → real item name
+
+for item in raw_item_list:
+    item_counter[item] += 1
+    if item_counter[item] > 1:
+        label = f"{item} #{item_counter[item]}"
+    else:
+        label = item
+    item_options.append(label)
+    item_map[label] = item
+
+selected_labels = st.multiselect("Select items received:", item_options)
 
 entry_data = {}
-for item in selected_items:
-    st.markdown(f"### Entry for: `{item}`")
-    
-    # Lookup Quantity PO from filtered_df
-    item_row = filtered_df[filtered_df['Item Name Complete'] == item]
+for label in selected_labels:
+    real_item = item_map[label]
+    st.markdown(f"### Entry for: `{real_item}`")
+
+    item_row = filtered_df[filtered_df['Item Name Complete'] == real_item]
     if not item_row.empty:
         max_qty = int(item_row['Quantity PO'].iloc[0])
     else:
-        max_qty = None  # fallback if not found
+        max_qty = None
 
     col1, col2 = st.columns(2)
     with col1:
         if max_qty is not None:
             qty = st.number_input(
-                f"Quantity for `{item}`",
+                f"Quantity for `{label}`",
                 min_value=1,
                 max_value=max_qty,
                 step=1,
-                key=f"qty_{item}"
+                key=f"qty_{label}"
             )
         else:
-            st.warning(f"⚠️ Max quantity for `{item}` not found in PO data.")
+            st.warning(f"⚠️ Max quantity for `{real_item}` not found in PO data.")
             qty = st.number_input(
-                f"Quantity for `{item}`",
+                f"Quantity for `{label}`",
                 min_value=1,
                 step=1,
-                key=f"qty_{item}"
+                key=f"qty_{label}"
             )
     with col2:
-        vessel = st.selectbox(f"Vessel for `{item}`", vessel_options, key=f"vessel_{item}")
-    
-    entry_data[item] = {
+        vessel = st.selectbox(f"Vessel for `{label}`", vessel_options, key=f"vessel_{label}")
+
+    entry_data[label] = {
+        "real_item": real_item,
         "quantity": qty,
         "vessel": vessel
     }
@@ -116,27 +124,23 @@ uploaded_files = st.file_uploader("Upload photos (unlimited):", accept_multiple_
 
 # --- Submission ---
 if st.button("Submit"):
-    if not selected_items or all(values["quantity"] == 0 for values in entry_data.values()):
+    if not selected_labels or all(values["quantity"] == 0 for values in entry_data.values()):
         st.error("Please select items and enter a non-zero quantity for at least one.")
     else:
         timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
         folder_name = f"{selected_db}_{selected_po}_{timestamp}"
 
-        # --- Step 1: Upload Photos ---
+        # Step 1: Upload Photos
         photo_payload = {
             "folder_name": folder_name,
             "images": [
-                {
-                    "filename": file.name,
-                    "content": base64.b64encode(file.read()).decode("utf-8")
-                }
+                {"filename": file.name, "content": base64.b64encode(file.read()).decode("utf-8")}
                 for file in uploaded_files
             ]
         }
 
         drive_folder_url = "UPLOAD_FAILED"
         photo_success = False
-
         try:
             photo_response = requests.post(WEBHOOK_URL_PHOTO, json=photo_payload)
             if photo_response.status_code == 200:
@@ -153,9 +157,9 @@ if st.button("Submit"):
         except Exception as e:
             st.error(f"❌ Photo upload error: {e}")
 
-        # --- Step 2: Send Metadata to Google Sheets ---
+        # Step 2: Send Metadata
         entries = []
-        for item, values in entry_data.items():
+        for label, values in entry_data.items():
             if values["quantity"] > 0:
                 entries.append({
                     "timestamp": timestamp,
@@ -164,7 +168,7 @@ if st.button("Submit"):
                     "pic": selected_pic,
                     "po_pic": selected_po_pic,
                     "vendor": po_vendor,
-                    "item": item,
+                    "item": values["real_item"],
                     "quantity": values["quantity"],
                     "vessel": values["vessel"]
                 })
@@ -191,7 +195,6 @@ if st.button("Submit"):
         except Exception as e:
             st.error(f"❌ Logging error: {e}")
 
-        # --- Final Result ---
         if photo_success and data_success:
             st.success("🎉 Submission completed successfully!")
         elif not photo_success and not data_success:
