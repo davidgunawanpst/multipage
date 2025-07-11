@@ -11,8 +11,8 @@ SHEET_NAME = "Sheet2"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbwAR8CljOqIinBz5zKHn02YAVO1VAaIJFT_aI6uh91fLVln5bGS0_aC4AvnO4-HXuBDmg/exec"
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwAR8CljOqIinBz5zKHn02YAVO1VAaIJFT_aI6uh91fLVln5bGS0_aC4AvnO4-HXuBDmg/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbzU8ymaN7CaQMevzbkVHIV0Tbl2jNkg4HGm3JzckFqFf_YQZXKs0Z_SJ-09XqkzHFi-/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbzU8ymaN7CaQMevzbkVHIV0Tbl2jNkg4HGm3JzckFqFf_YQZXKs0Z_SJ-09XqkzHFi-/exec"
 
 # --- Load PO Data from Google Sheet ---
 @st.cache_data
