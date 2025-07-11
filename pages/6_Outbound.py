@@ -81,6 +81,8 @@ if st.button("✅ Submit"):
         st.warning("Please fill in Nama Ekspedisi.")
     elif not tujuan.strip():
         st.warning("Please fill in Tujuan.")
+    elif not nomor_matrix.strip():
+        st.warning("Please fill in Nomor Matrix")
     elif not selected_pl:
         st.warning("Please select at least one Pick List Number.")
     elif not uploaded_files:
