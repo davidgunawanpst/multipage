@@ -71,7 +71,7 @@ vessel_options = sorted(
 )
 
 # --- Item, Quantity, and Vessel Input ---
-item_options = database_data[selected_db][selected_po]
+item_options = filtered_df['Item Name Complete'].dropna().tolist()
 selected_items = st.multiselect("Select items received:", item_options)
 
 entry_data = {}
