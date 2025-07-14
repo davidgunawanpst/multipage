@@ -8,7 +8,8 @@ st.write("This is a placeholder for the Delivery Planning module.")
 pic_list = [
   "Sendy Juniar Eka",
   "Junedi",
-  "Abim Priambada"
+  "Abim Priambada",
+  "Adjie"
 ]
 db_list = [
     "DMI",
