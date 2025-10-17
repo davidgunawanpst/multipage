@@ -32,7 +32,7 @@ def valid_itr(itr: str) -> bool:
     return len(itr) == 9 and itr.isdigit() and itr.startswith("2")
 
 if check_password():
-    st.title("Manual Receive")
+    st.title("ITR")
 
     selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
     selected_db = st.selectbox("Database:", db_list)
