@@ -29,7 +29,6 @@ db_list = [
 ]
 
 # --- UI ---
-import streamlit as st
 from auth import check_password
 
 if check_password():
@@ -68,7 +67,7 @@ if check_password():
                     st.error(f"❌ Logging error: {e}")
         
                 # --- Final Status ---
-                if photo_success:
+                if data_success:
                     st.success("🎉 Submission completed successfully!")
                 elif not data_success:
                     st.warning("⚠️ Data logging failed.")
