@@ -5,7 +5,7 @@ from zoneinfo import ZoneInfo
 from auth import check_password  # keep your auth
 
 # Must be called before any other st.* UI calls
-st.set_page_config(page_title="Pick List", layout="wide")
+st.set_page_config(page_title="Packing Start", layout="wide")
 
 # --- WEBHOOK URL ---
 WEBHOOK_URL_DATA = "[INSERT WEBHOOK URL]"
