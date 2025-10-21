@@ -36,7 +36,7 @@ if check_password():
 
     selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
     selected_db = st.selectbox("Database:", db_list)
-    pick_number = st.text_input("Nomor (numbers only):", placeholder="e.g. 200123456")
+    pick_number = st.text_input("Nomor (numbers only):", placeholder="e.g. 12345")
 
     if st.button("✅ Submit"):
         # basic validation
