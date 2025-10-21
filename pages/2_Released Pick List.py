@@ -8,7 +8,7 @@ from auth import check_password  # keep your auth
 st.set_page_config(page_title="Released Pick List", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "[INSERT WEBHOOK URL]"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxoyZMt6nCcK30UHbiHnBw4IdNww2KUxpVgCuetWCsTxGqKnw47U93U1SNMeW5yv_Tm/exec"
 
 # --- Static lists ---
 pic_list = [
