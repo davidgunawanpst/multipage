@@ -39,8 +39,10 @@ if check_password():
         for i in range(jumlah_peti):
             st.markdown(f"**Detail Peti #{i+1}**")
             berat = st.text_input(f"Berat Peti #{i+1} (Kg)")
-            dimensi = st.text_input(f"Dimensi Peti #{i+1} (CBM)")
-            peti_details.append({"berat": berat, "dimensi": dimensi})
+            panjang = st.text_input(f"Panjang Peti #{i+1} (meter)")
+            lebar = st.text_input(f"Lebar Peti #{i+1} (meter)")
+            tinggi = st.text_input(f"Tinggi Peti #{i+1} (meter)")
+            peti_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
         
         # --- Dus ---
         jumlah_dus = st.number_input("Jumlah Dus", min_value=0, step=1)
@@ -48,17 +50,20 @@ if check_password():
         for i in range(jumlah_dus):
             st.markdown(f"**Detail Dus #{i+1}**")
             berat = st.text_input(f"Berat Dus #{i+1} (Kg)")
-            dimensi = st.text_input(f"Dimensi Dus #{i+1} (CBM)")
-            dus_details.append({"berat": berat, "dimensi": dimensi})
-        
+            panjang = st.text_input(f"Panjang Dus #{i+1} (meter)")
+            lebar = st.text_input(f"Lebar Dus #{i+1} (meter)")
+            tinggi = st.text_input(f"Tinggi Dus #{i+1} (meter)")
+            dus_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})        
         # --- Plastik ---
         jumlah_plastik = st.number_input("Jumlah Plastik", min_value=0, step=1)
         plastik_details = []
         for i in range(jumlah_plastik):
             st.markdown(f"**Detail Plastik #{i+1}**")
             berat = st.text_input(f"Berat Plastik #{i+1} (Kg)")
-            dimensi = st.text_input(f"Dimensi Plastik #{i+1} (CBM)")
-            plastik_details.append({"berat": berat, "dimensi": dimensi})
+            panjang = st.text_input(f"Panjang Plastik #{i+1} (meter)")
+            lebar = st.text_input(f"Lebar Plastik #{i+1} (meter)")
+            tinggi = st.text_input(f"Tinggi Plastik #{i+1} (meter)")
+            plastik_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
         jumlah_peti = int(jumlah_peti)
         jumlah_dus = int(jumlah_dus)
         jumlah_plastik = int(jumlah_plastik)
