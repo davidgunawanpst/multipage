@@ -50,7 +50,7 @@ if check_password():
                 "timestamp": timestamp,
                 "pic": selected_pic,
                 "database": selected_db,
-                "nomor": pick_number.strip(),
+                "pl_released": pick_number.strip(),
             }
 
             try:
