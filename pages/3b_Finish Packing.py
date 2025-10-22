@@ -81,7 +81,7 @@ if check_password():
                 st.warning("Please upload at least one photo.")
             else:
                 timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
-                folder_name = f"Outbound_{selected_db}_{selected_pl}"
+                folder_name = f"Outbound_{selected_db}_{pick_number}"
         
                 # Step 1: Upload Photos
                 photo_payload = {
