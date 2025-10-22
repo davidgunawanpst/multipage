@@ -113,7 +113,7 @@ if check_password():
                 data_payload = {
                     "PIC": selected_pic,
                     "database": selected_db,
-                    "nomor_pick_list": pick_number,
+                    "finishpl": pick_number,
                     "jumlah_peti": jumlah_peti,
                     "peti_details": peti_details,
                     "jumlah_dus": jumlah_dus,
