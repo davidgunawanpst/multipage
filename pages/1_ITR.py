@@ -8,7 +8,7 @@ from auth import check_password  # keep your auth
 st.set_page_config(page_title="ITR", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycby271wV3KRfgiPIQ_XkHaJSUXjIBF9ftCJ_MmPw6iNXmAXlU94YN3HSAjnl23nmg8A3ig/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwe5Yt3fI7ETRoCTmKqEbRCqyrN7jX6IYXb_c7sY_0IvDz3gQ-yFethiWYJTtJ125AVJw/exec"
 
 # --- Static lists ---
 pic_list = [
