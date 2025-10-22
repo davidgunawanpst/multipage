@@ -7,8 +7,8 @@ import base64
 from auth import check_password
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbzAWwYPtL1qsgLtNnaf8-8EXyqNkJ1oVlkaD7TnoW45bfNU9ooS0h7vjpeSMzRdJRE/exec"  # ← replace with real photo webhook
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbzAWwYPtL1qsgLtNnaf8-8EXyqNkJ1oVlkaD7TnoW45bfNU9ooS0h7vjpeSMzRdJRE/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbyz4PIDJJbdMZyZfJi50VnyXUJ4bTxKCgkZv6E7hJPnvXB0yaQo354GjPqUOby7vdvb/exec"  # ← replace with real photo webhook
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyz4PIDJJbdMZyZfJi50VnyXUJ4bTxKCgkZv6E7hJPnvXB0yaQo354GjPqUOby7vdvb/exec"
 
 # --- PIC List ---
 pic_list = [
