@@ -8,7 +8,7 @@ from auth import check_password  # keep your auth
 st.set_page_config(page_title="Packing Start", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbx6xwu7cRczDUK69Ghziz6Vv6Z5X8d8WD8D4OpKGSqq-izJOKMlqEYk-K0Z6Uu3I8O_5Q/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyUorRxV4pgkSJw6BxMJwPfkb_xD6vKwmiDVZ1vYNU9PUxn9kkNew0tyETcjFNL9RwX/exec"
 
 # --- Static lists ---
 pic_list = [
