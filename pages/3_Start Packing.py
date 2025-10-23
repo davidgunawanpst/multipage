@@ -39,27 +39,27 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
 
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
     """Return Pick List numbers for the selected DB where Start Packing is blank."""
-    # Ensure consistent column names
     df.columns = df.columns.str.strip()
 
     if not {"Database", "Pick List NO.", "Start Packing"}.issubset(df.columns):
         raise ValueError("Sheet missing required columns: Database, Pick List NO., Start Packing")
 
-    # Filter by Database and empty Start Packing
     filtered = df[
         (df["Database"].astype(str).str.strip() == selected_db)
         & (df["Start Packing"].isna() | (df["Start Packing"].astype(str).str.strip() == ""))
     ]
 
+    # --- Convert numbers like 11111.0 → '11111' ---
     picks = (
         filtered["Pick List NO."]
         .dropna()
-        .astype(str)
+        .apply(lambda x: str(int(x)) if isinstance(x, (float, int)) and x == int(x) else str(x))
         .str.strip()
         .unique()
         .tolist()
     )
     return sorted(picks)
+
 
 
 # --- Main app ---
