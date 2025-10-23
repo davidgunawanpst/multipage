@@ -1,13 +1,20 @@
 import streamlit as st
 import requests
+import pandas as pd
 from datetime import datetime
 from zoneinfo import ZoneInfo
+from io import StringIO
 from auth import check_password  # keep your auth
 
-# Must be called before any other st.* UI calls
+# --- Streamlit page setup ---
 st.set_page_config(page_title="Packing Start", layout="wide")
 
-# --- WEBHOOK URL ---
+# --- Google Sheet details ---
+SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
+SHEET_NAME = "SLA Packing"
+CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
+
+# --- Your webhook URL ---
 WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxvTf8wLg1JKFbAReP8K5AS1togC4KyOCy6cAoo2tJr_2kP5jMbAA151Jq2EVPzkOuk2Q/exec"
 
 # --- Static lists ---
@@ -17,48 +24,85 @@ pic_list = [
     "Rian Dinata",
     "Harimurti Krisandki",
     "Muchamad Mustofa",
-    "Yogie Arie Wibowo"
+    "Yogie Arie Wibowo",
 ]
+db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
 
-db_list = [
-    "DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"
-]
 
-def valid_number(value: str) -> bool:
-    """Validates that the input contains only digits (non-empty)."""
-    if not value:
-        return False
-    value = value.strip()
-    return value.isdigit()
+# --- Functions ---
+def load_sheet_csv(url: str) -> pd.DataFrame:
+    """Load the Google Sheet (published CSV) into a pandas DataFrame."""
+    resp = requests.get(url, timeout=15)
+    resp.raise_for_status()
+    return pd.read_csv(StringIO(resp.text))
 
+
+def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
+    """Return Pick List numbers for the selected DB where Start Packing is blank."""
+    # Ensure consistent column names
+    df.columns = df.columns.str.strip()
+
+    if not {"Database", "Pick List NO.", "Start Packing"}.issubset(df.columns):
+        raise ValueError("Sheet missing required columns: Database, Pick List NO., Start Packing")
+
+    # Filter by Database and empty Start Packing
+    filtered = df[
+        (df["Database"].astype(str).str.strip() == selected_db)
+        & (df["Start Packing"].isna() | (df["Start Packing"].astype(str).str.strip() == ""))
+    ]
+
+    picks = (
+        filtered["Pick List NO."]
+        .dropna()
+        .astype(str)
+        .str.strip()
+        .unique()
+        .tolist()
+    )
+    return sorted(picks)
+
+
+# --- Main app ---
 if check_password():
-    st.title("Pick List")
+    st.title("📦 Packing Start — Pick List")
 
     selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
     selected_db = st.selectbox("Database:", db_list)
-    pick_number = st.text_input("Nomor (numbers only):", placeholder="e.g. 12345")
 
+    # Load the sheet and populate pick list dropdown dynamically
+    try:
+        with st.spinner("Loading pick list data..."):
+            df = load_sheet_csv(CSV_URL)
+            available_picks = get_available_picks(df, selected_db)
+    except Exception as e:
+        st.error(f"❌ Failed to load Google Sheet: {e}")
+        available_picks = []
+
+    if not available_picks:
+        st.warning("No available Pick Lists found for this database.")
+        pick_number = st.selectbox("Pick List Number:", ["— none available —"])
+    else:
+        pick_number = st.selectbox("Pick List Number:", available_picks)
+
+    # Submit button
     if st.button("✅ Submit"):
-        # basic validation
-        if not pick_number or not pick_number.strip():
-            st.warning("Nomor is required.")
-        elif not valid_number(pick_number):
-            st.warning("Nomor must contain digits only.")
+        if not available_picks or pick_number == "— none available —":
+            st.warning("Please select a valid Pick List number.")
         else:
             timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
             data_payload = {
                 "timestamp": timestamp,
                 "pic": selected_pic,
                 "database": selected_db,
-                "pl_released": pick_number.strip(),
+                "pl_released": pick_number,
             }
 
             try:
-                with st.spinner("Sending..."):
+                with st.spinner("Sending data..."):
                     resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=20)
                 if resp.status_code in (200, 201):
                     st.success("🎉 Submission completed successfully!")
                 else:
-                    st.error(f"❌ Data logging failed: {resp.status_code} - {resp.text}")
+                    st.error(f"❌ Failed to send: {resp.status_code} - {resp.text}")
             except Exception as e:
                 st.error(f"❌ Network/error sending data: {e}")
