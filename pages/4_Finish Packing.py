@@ -36,7 +36,7 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     Return Pick List numbers for the selected DB where:
       - Start Packing is present (not blank)
       - Finish Packing is blank (not started / not finished)
-    Also convert floats like 11111.0 -> '11111' for display.
+    Converts numeric floats like 11111.0 -> '11111' for display.
     """
     df = df.copy()
     df.columns = df.columns.str.strip()
@@ -60,12 +60,10 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     def clean_pick(x):
         if pd.isna(x):
             return None
-        # if float or int and integer-like, make it int then string
         if isinstance(x, float) and x.is_integer():
             return str(int(x))
-        if isinstance(x, (int,)) :
+        if isinstance(x, int):
             return str(x)
-        # otherwise just strip string
         return str(x).strip()
 
     picks_series = filtered["Pick List NO."].map(clean_pick).dropna().astype(str).str.strip()
@@ -91,12 +89,12 @@ if check_password():
 
     if not available_picks:
         st.warning("No available Pick Lists where Start Packing exists and Finish Packing is empty.")
-        pick_number = st.selectbox("Pick List Number:", ["— none available —"])
+        pick_numbers = st.multiselect("Pick List Number(s):", [])
     else:
-        pick_number = st.selectbox("Pick List Number:", available_picks)
+        pick_numbers = st.multiselect("Pick List Number(s):", available_picks)
 
     # --- Peti ---
-    jumlah_peti = st.number_input("Jumlah Peti", min_value=0, step=1)
+    jumlah_peti = int(st.number_input("Jumlah Peti", min_value=0, step=1, value=0))
     peti_details = []
     for i in range(int(jumlah_peti)):
         st.markdown(f"**Detail Peti #{i+1}**")
@@ -107,7 +105,7 @@ if check_password():
         peti_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Dus ---
-    jumlah_dus = st.number_input("Jumlah Dus", min_value=0, step=1)
+    jumlah_dus = int(st.number_input("Jumlah Dus", min_value=0, step=1, value=0))
     dus_details = []
     for i in range(int(jumlah_dus)):
         st.markdown(f"**Detail Dus #{i+1}**")
@@ -118,7 +116,7 @@ if check_password():
         dus_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Plastik ---
-    jumlah_plastik = st.number_input("Jumlah Karung", min_value=0, step=1)
+    jumlah_plastik = int(st.number_input("Jumlah Karung", min_value=0, step=1, value=0))
     plastik_details = []
     for i in range(int(jumlah_plastik)):
         st.markdown(f"**Detail Karung #{i+1}**")
@@ -133,17 +131,22 @@ if check_password():
 
     # --- Submit Button ---
     if st.button("✅ Submit"):
-        if not selected_pic.strip():
+        # Validation
+        if not selected_pic or not selected_pic.strip():
             st.warning("Please fill in Nama PIC.")
-        elif not selected_db.strip():
+        elif not selected_db or not selected_db.strip():
             st.warning("Please fill in Database.")
-        elif not available_picks or pick_number == "— none available —":
-            st.warning("Please select a valid Pick List number.")
+        elif not pick_numbers:
+            st.warning("Please select at least one Pick List number.")
         elif not uploaded_files:
             st.warning("Please upload at least one photo.")
         else:
-            timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
-            folder_name = f"Outbound_{selected_db}_{pick_number}"
+            # Timestamp in DD/MM/YYYY as requested
+            timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
+            picks_csv = ", ".join(pick_numbers)
+            # For folder name, keep safe string (join with underscore)
+            safe_picks_join = "_".join(pick_numbers)
+            folder_name = f"Outbound_{selected_db}_{safe_picks_join}"
 
             # Step 1: Upload Photos
             try:
@@ -180,10 +183,10 @@ if check_password():
 
             # Step 2: Send Metadata (payload field names preserved as you used previously)
             data_payload = {
-                "timestamp": timestamp,
+                "timestamp": timestamp,             # now DD/MM/YYYY
                 "PIC": selected_pic,
                 "database": selected_db,
-                "finishpl": pick_number,
+                "finishpl": picks_csv,             # comma-separated picks
                 "jumlah_peti": int(jumlah_peti),
                 "peti_details": peti_details,
                 "jumlah_dus": int(jumlah_dus),
