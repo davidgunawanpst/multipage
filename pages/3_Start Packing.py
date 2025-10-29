@@ -15,7 +15,7 @@ SHEET_NAME = "SLA Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 # --- Your webhook URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxvTf8wLg1JKFbAReP8K5AS1togC4KyOCy6cAoo2tJr_2kP5jMbAA151Jq2EVPzkOuk2Q/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwFSn6IwvFz_mIonmY5eIZqLK73QYytJHCad4tkua92QZcQbQEOCOpEeBBSeUTR-Wmqnw/exec"
 
 # --- Static lists ---
 pic_list = [
