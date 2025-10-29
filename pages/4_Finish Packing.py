@@ -8,8 +8,8 @@ import base64
 from auth import check_password
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbyz5WZNEhSaLt7viqPUBU7RlXS9Krdojrr2P53FTyKYYUPo-rrqWQFH2jXFzqQgPReZ/exec"  # ← replace if needed
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyz5WZNEhSaLt7viqPUBU7RlXS9Krdojrr2P53FTyKYYUPo-rrqWQFH2jXFzqQgPReZ/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbxJ0WaJpIakFtUO4WfdDWrWfiekXeWMPJIeJWwTjcpERB1x-POBjTzCoXzXnDO15s4Q/exec"  # ← replace if needed
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxJ0WaJpIakFtUO4WfdDWrWfiekXeWMPJIeJWwTjcpERB1x-POBjTzCoXzXnDO15s4Q/exec"
 
 # --- Google Sheet details (public) ---
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
