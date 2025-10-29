@@ -118,14 +118,14 @@ if check_password():
         dus_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Plastik ---
-    jumlah_plastik = st.number_input("Jumlah Plastik", min_value=0, step=1)
+    jumlah_plastik = st.number_input("Jumlah Karung", min_value=0, step=1)
     plastik_details = []
     for i in range(int(jumlah_plastik)):
-        st.markdown(f"**Detail Plastik #{i+1}**")
-        berat = st.text_input(f"Berat Plastik #{i+1} (Kg)")
-        panjang = st.text_input(f"Panjang Plastik #{i+1} (cm)")
-        lebar = st.text_input(f"Lebar Plastik #{i+1} (cm)")
-        tinggi = st.text_input(f"Tinggi Plastik #{i+1} (cm)")
+        st.markdown(f"**Detail Karung #{i+1}**")
+        berat = st.text_input(f"Berat Karung #{i+1} (Kg)")
+        panjang = st.text_input(f"Panjang Karung #{i+1} (cm)")
+        lebar = st.text_input(f"Lebar Karung #{i+1} (cm)")
+        tinggi = st.text_input(f"Tinggi Karung #{i+1} (cm)")
         plastik_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Upload Proof Photos ---
