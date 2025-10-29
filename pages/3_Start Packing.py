@@ -28,14 +28,12 @@ pic_list = [
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
 
-
 # --- Functions ---
 def load_sheet_csv(url: str) -> pd.DataFrame:
     """Load the Google Sheet (published CSV) into a pandas DataFrame."""
     resp = requests.get(url, timeout=15)
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text))
-
 
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
     """Return Pick List numbers for the selected DB where Start Packing is blank."""
@@ -59,8 +57,6 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
         .tolist()
     )
     return sorted(picks)
-
-
 
 # --- Main app ---
 if check_password():
@@ -89,9 +85,12 @@ if check_password():
         if not available_picks or pick_number == "— none available —":
             st.warning("Please select a valid Pick List number.")
         else:
-            timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
+            # ✅ Format date as DD/MM/YYYY (Jakarta time)
+            input_date_str = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
+
+            # --- Payload ---
             data_payload = {
-                "timestamp": timestamp,
+                "input_date": input_date_str,  # use formatted date
                 "pic": selected_pic,
                 "database": selected_db,
                 "pl_released": pick_number,
@@ -102,6 +101,7 @@ if check_password():
                     resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=20)
                 if resp.status_code in (200, 201):
                     st.success("🎉 Submission completed successfully!")
+                    st.json(data_payload)
                 else:
                     st.error(f"❌ Failed to send: {resp.status_code} - {resp.text}")
             except Exception as e:
