@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from datetime import datetime
+from datetime import datetime, date
 from zoneinfo import ZoneInfo
 from auth import check_password  # keep your auth
 
@@ -38,19 +38,32 @@ if check_password():
     selected_db = st.selectbox("Database:", db_list)
     pick_number = st.text_input("Nomor (numbers only):", placeholder="e.g. 12345")
 
+    # Calendar input for Requirement Date
+    today_jkt = datetime.now(ZoneInfo("Asia/Jakarta")).date()
+    requirement_date = st.date_input(
+        "Requirement Date (click calendar):",
+        value=today_jkt,
+        help="Pick the required date (click the calendar icon)."
+    )
+
     if st.button("✅ Submit"):
-        # basic validation
+        # Basic validation
         if not pick_number or not pick_number.strip():
             st.warning("Nomor is required.")
         elif not valid_number(pick_number):
             st.warning("Nomor must contain digits only.")
         else:
-            timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%Y-%m-%d_%H-%M-%S")
+            # --- Format dates as DD/MM/YYYY ---
+            input_date_str = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
+            req_date_str = requirement_date.strftime("%d/%m/%Y")
+
+            # --- Structured payload ---
             data_payload = {
-                "timestamp": timestamp,
-                "pic": selected_pic,
                 "database": selected_db,
-                "pl_released": pick_number.strip(),
+                "nomor_pl": pick_number.strip(),
+                "pic": selected_pic,
+                "input_date": input_date_str,
+                "requirement_date": req_date_str,
             }
 
             try:
@@ -58,6 +71,7 @@ if check_password():
                     resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=20)
                 if resp.status_code in (200, 201):
                     st.success("🎉 Submission completed successfully!")
+                    st.json(data_payload)  # optional, show payload for debug
                 else:
                     st.error(f"❌ Data logging failed: {resp.status_code} - {resp.text}")
             except Exception as e:
