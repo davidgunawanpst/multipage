@@ -8,18 +8,13 @@ import base64
 from auth import check_password
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbxJ0WaJpIakFtUO4WfdDWrWfiekXeWMPJIeJWwTjcpERB1x-POBjTzCoXzXnDO15s4Q/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbxJ0WaJpIakFtUO4WfdDWrWfiekXeWMPJIeJWwTjcpERB1x-POBjTzCoXzXnDO15s4Q/exec"  # ← replace if needed
 WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxJ0WaJpIakFtUO4WfdDWrWfiekXeWMPJIeJWwTjcpERB1x-POBjTzCoXzXnDO15s4Q/exec"
 
 # --- Google Sheet details (public) ---
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 SHEET_NAME = "SLA Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
-
-# --- Vessel Sheet ---
-VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
-VESSEL_SHEET_NAME = "Vessel"
-VESSEL_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={VESSEL_SHEET_NAME}"
 
 # --- PIC List ---
 pic_list = [
@@ -37,6 +32,12 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
     return pd.read_csv(StringIO(resp.text))
 
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
+    """
+    Return Pick List numbers for the selected DB where:
+      - Start Packing is present (not blank)
+      - Finish Packing is blank (not started / not finished)
+    Converts numeric floats like 11111.0 -> '11111' for display.
+    """
     df = df.copy()
     df.columns = df.columns.str.strip()
 
@@ -44,15 +45,18 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     if not required.issubset(set(df.columns)):
         raise ValueError(f"Sheet missing required columns: {required - set(df.columns)}")
 
+    # Normalize string columns for filtering
     db_col = df["Database"].astype(str).str.strip()
     start_col = df["Start Packing"]
     finish_col = df["Finish Packing"]
 
+    # Condition: Start Packing is not empty/null AND Finish Packing is empty/null
     start_has_value = ~(start_col.isna() | (start_col.astype(str).str.strip() == ""))
     finish_empty = (finish_col.isna() | (finish_col.astype(str).str.strip() == ""))
 
     filtered = df[(db_col == selected_db) & start_has_value & finish_empty]
 
+    # Clean Pick List NO. values: convert numeric floats that are integers to clean strings
     def clean_pick(x):
         if pd.isna(x):
             return None
@@ -66,20 +70,6 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     picks_unique = sorted(set(picks_series.tolist()))
     return picks_unique
 
-def get_vessels_for_db(selected_db: str) -> list:
-    """Fetch vessels from Vessel sheet for the selected DB"""
-    try:
-        df_vessel = load_sheet_csv(VESSEL_CSV_URL)
-        df_vessel.columns = df_vessel.columns.str.strip()
-        if not {"DB", "Vessel  Name"}.issubset(df_vessel.columns):
-            return []
-        df_filtered = df_vessel[df_vessel["DB"].astype(str).str.strip() == selected_db]
-        vessels = sorted(set(df_filtered["Vessel  Name"].dropna().astype(str).str.strip()))
-        return vessels
-    except Exception as e:
-        st.warning(f"⚠️ Could not load vessel list: {e}")
-        return []
-
 if check_password():
     st.set_page_config(page_title="Finish Packing", layout="wide")
     st.title("Finish Packing")
@@ -87,13 +77,6 @@ if check_password():
     selected_pic = st.selectbox("PIC :", pic_list)
     db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
     selected_db = st.selectbox("Database:", db_list)
-
-    # --- Vessel selector (NEW) ---
-    vessels = get_vessels_for_db(selected_db)
-    if vessels:
-        selected_vessel = st.selectbox("Vessel Name:", vessels)
-    else:
-        selected_vessel = st.text_input("Vessel Name (manual entry if not found):")
 
     # Load sheet & create dropdown for pick numbers
     try:
@@ -148,19 +131,20 @@ if check_password():
 
     # --- Submit Button ---
     if st.button("✅ Submit"):
+        # Validation
         if not selected_pic or not selected_pic.strip():
             st.warning("Please fill in Nama PIC.")
         elif not selected_db or not selected_db.strip():
             st.warning("Please fill in Database.")
         elif not pick_numbers:
             st.warning("Please select at least one Pick List number.")
-        elif not selected_vessel or not selected_vessel.strip():
-            st.warning("Please select or input a Vessel Name.")
         elif not uploaded_files:
             st.warning("Please upload at least one photo.")
         else:
+            # Timestamp in DD/MM/YYYY as requested
             timestamp = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
             picks_csv = ", ".join(pick_numbers)
+            # For folder name, keep safe string (join with underscore)
             safe_picks_join = "_".join(pick_numbers)
             folder_name = f"Outbound_{selected_db}_{safe_picks_join}"
 
@@ -197,13 +181,12 @@ if check_password():
                 photo_success = False
                 drive_folder_url = "UPLOAD_FAILED"
 
-            # Step 2: Send Metadata (payload field names preserved)
+            # Step 2: Send Metadata (payload field names preserved as you used previously)
             data_payload = {
-                "timestamp": timestamp,
+                "timestamp": timestamp,             # now DD/MM/YYYY
                 "PIC": selected_pic,
                 "database": selected_db,
-                "vessel_name": selected_vessel,     # 🆕 include vessel
-                "finishpl": picks_csv,
+                "finishpl": picks_csv,             # comma-separated picks
                 "jumlah_peti": int(jumlah_peti),
                 "peti_details": peti_details,
                 "jumlah_dus": int(jumlah_dus),
