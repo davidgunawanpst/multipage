@@ -14,7 +14,7 @@ WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxWbgUXQ5qjCCbxnxLpY
 
 # --- GOOGLE SHEET: VESSEL LIST ---
 VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
-VESSEL_SHEET_NAME = "Vessel"
+VESSEL_SHEET_NAME = "Vessel Name"
 VESSEL_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={VESSEL_SHEET_NAME}"
 
 # --- Static lists ---
