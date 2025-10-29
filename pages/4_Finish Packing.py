@@ -101,9 +101,9 @@ if check_password():
     for i in range(int(jumlah_peti)):
         st.markdown(f"**Detail Peti #{i+1}**")
         berat = st.text_input(f"Berat Peti #{i+1} (Kg)")
-        panjang = st.text_input(f"Panjang Peti #{i+1} (meter)")
-        lebar = st.text_input(f"Lebar Peti #{i+1} (meter)")
-        tinggi = st.text_input(f"Tinggi Peti #{i+1} (meter)")
+        panjang = st.text_input(f"Panjang Peti #{i+1} (cm)")
+        lebar = st.text_input(f"Lebar Peti #{i+1} (cm)")
+        tinggi = st.text_input(f"Tinggi Peti #{i+1} (cm)")
         peti_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Dus ---
@@ -112,9 +112,9 @@ if check_password():
     for i in range(int(jumlah_dus)):
         st.markdown(f"**Detail Dus #{i+1}**")
         berat = st.text_input(f"Berat Dus #{i+1} (Kg)")
-        panjang = st.text_input(f"Panjang Dus #{i+1} (meter)")
-        lebar = st.text_input(f"Lebar Dus #{i+1} (meter)")
-        tinggi = st.text_input(f"Tinggi Dus #{i+1} (meter)")
+        panjang = st.text_input(f"Panjang Dus #{i+1} (cm)")
+        lebar = st.text_input(f"Lebar Dus #{i+1} (cm)")
+        tinggi = st.text_input(f"Tinggi Dus #{i+1} (cm)")
         dus_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Plastik ---
@@ -123,9 +123,9 @@ if check_password():
     for i in range(int(jumlah_plastik)):
         st.markdown(f"**Detail Plastik #{i+1}**")
         berat = st.text_input(f"Berat Plastik #{i+1} (Kg)")
-        panjang = st.text_input(f"Panjang Plastik #{i+1} (meter)")
-        lebar = st.text_input(f"Lebar Plastik #{i+1} (meter)")
-        tinggi = st.text_input(f"Tinggi Plastik #{i+1} (meter)")
+        panjang = st.text_input(f"Panjang Plastik #{i+1} (cm)")
+        lebar = st.text_input(f"Lebar Plastik #{i+1} (cm)")
+        tinggi = st.text_input(f"Tinggi Plastik #{i+1} (cm)")
         plastik_details.append({"berat": berat, "panjang": panjang, "lebar": lebar, "tinggi": tinggi})
 
     # --- Upload Proof Photos ---
