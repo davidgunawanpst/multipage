@@ -10,7 +10,7 @@ from auth import check_password  # your auth module
 st.set_page_config(page_title="Released Pick List", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwevKRUTmhsGL3pODzZOTTfOevcheEirORDr6MNt7jx2F31xMkCUYziMbZm4mV4c7Dkcg/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxeSf6XTdcHd3hk7WPWsob5TGa7nl6S3322_XVwqYtbADf9c4dehS5F7Yd3chvn_WuYSw/exec"
 
 # --- GOOGLE SHEETS ---
 VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
