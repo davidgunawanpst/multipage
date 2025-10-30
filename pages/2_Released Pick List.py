@@ -58,6 +58,7 @@ if check_password():
     selected_pic = st.selectbox("PIC (Submitting this form):", pic_list)
     selected_db = st.selectbox("Database:", db_list)
     release_type = st.radio("Release Type:", ["Normal", "Manual"])
+    urgent = st.radio("Urgent?", ["Normal", "Urgent"])
 
     # --- Load Vessel Data ---
     df_vessel = load_csv(VESSEL_CSV_URL)
@@ -120,7 +121,8 @@ if check_password():
                     "vessel_name": vessel_name.strip(),
                     "pic": selected_pic,
                     "input_date": input_date_str,
-                    "requirement_date": req_date_str
+                    "requirement_date": req_date_str,
+                    "urgent_status": urgent
                 }
             else:
                 data_payload = {
@@ -132,7 +134,8 @@ if check_password():
                     "vessel_name": vessel_name.strip(),
                     "remarks": remarks.strip(),
                     "input_date": input_date_str,
-                    "requirement_date": req_date_str
+                    "requirement_date": req_date_str,
+                    "urgent_status":urgent
                 }
 
             # --- Send to Webhook ---
