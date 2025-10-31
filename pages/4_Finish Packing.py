@@ -31,99 +31,44 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text))
 
-def extract_from_unique_code(unique_code_value):
-    """
-    Given 'Unique Code' like 'DMI|DMI-Manual-1' return last non-empty segment.
-    Returns None if nothing useful found.
-    """
-    if unique_code_value is None:
-        return None
-    s = str(unique_code_value).strip()
-    if s == "":
-        return None
-    parts = [p.strip() for p in s.split("|") if p and p.strip() != ""]
-    if not parts:
-        return None
-    return parts[-1]
-
-def clean_candidate_value(val):
-    """
-    Clean a candidate pick-list identifier:
-    - If float/int and whole number -> convert to int string (3008.0 -> "3008")
-    - Else convert to stripped string
-    - Return None for empty-like tokens
-    """
-    if val is None or (isinstance(val, float) and pd.isna(val)):
-        return None
-    if isinstance(val, float) and val.is_integer():
-        return str(int(val))
-    if isinstance(val, int):
-        return str(val)
-    s = str(val).strip()
-    if s.lower() in {"", "nan", "none", "na"}:
-        return None
-    return s
-
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     """
     Return Pick List numbers for the selected DB where:
       - Start Packing is present (not blank)
       - Finish Packing is blank (not started / not finished)
-    Prefer 'Pick List NO.' if present; otherwise fallback to extracting from 'Unique Code'.
-    Cleans numeric floats like 3008.0 -> '3008' and preserves textual IDs.
+    Converts numeric floats like 11111.0 -> '11111' for display.
     """
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    # Required columns
     required = {"Database", "Pick List NO.", "Start Packing", "Finish Packing"}
     if not required.issubset(set(df.columns)):
-        missing = required - set(df.columns)
-        raise ValueError(f"Sheet missing required columns: {missing}")
+        raise ValueError(f"Sheet missing required columns: {required - set(df.columns)}")
 
-    # Normalize database column
-    df["Database"] = df["Database"].astype(str).str.strip()
+    # Normalize string columns for filtering
+    db_col = df["Database"].astype(str).str.strip()
+    start_col = df["Start Packing"]
+    finish_col = df["Finish Packing"]
 
-    # Prepare Start and Finish for checks (treat 'nan' / 'None' as blank)
-    start_raw = df["Start Packing"]
-    finish_raw = df["Finish Packing"]
+    # Condition: Start Packing is not empty/null AND Finish Packing is empty/null
+    start_has_value = ~(start_col.isna() | (start_col.astype(str).str.strip() == ""))
+    finish_empty = (finish_col.isna() | (finish_col.astype(str).str.strip() == ""))
 
-    start_has_value = ~(start_raw.isna() | (start_raw.astype(str).str.strip() == ""))
-    finish_empty = (finish_raw.isna() | (finish_raw.astype(str).str.strip() == ""))
+    filtered = df[(db_col == selected_db) & start_has_value & finish_empty]
 
-    # Filter rows by database, start present, finish empty
-    filtered = df[(df["Database"] == selected_db) & (start_has_value) & (finish_empty)].copy()
+    # Clean Pick List NO. values: convert numeric floats that are integers to clean strings
+    def clean_pick(x):
+        if pd.isna(x):
+            return None
+        if isinstance(x, float) and x.is_integer():
+            return str(int(x))
+        if isinstance(x, int):
+            return str(x)
+        return str(x).strip()
 
-    # Build candidates: prefer Pick List NO., else Unique Code fallback
-    picks = []
-    for _, row in filtered.iterrows():
-        raw_pl = row.get("Pick List NO.", None)
-        candidate = clean_candidate_value(raw_pl)
-
-        if candidate is None:
-            # fallback to Unique Code if Pick List NO. missing/empty
-            unique_val = row.get("Unique Code", None) if "Unique Code" in row.index else None
-            candidate = extract_from_unique_code(unique_val)
-            candidate = clean_candidate_value(candidate)
-
-        if candidate:
-            picks.append(candidate)
-
-    # Preserve first-seen order, but sort numeric-only ids numerically before strings
-    # First create order-preserving dedupe:
-    seen = {}
-    ordered = []
-    for p in picks:
-        if p not in seen:
-            seen[p] = True
-            ordered.append(p)
-
-    # Split digits vs nondigits
-    digits = [x for x in ordered if x.isdigit()]
-    nondigits = [x for x in ordered if not x.isdigit()]
-
-    digits_sorted = sorted(digits, key=lambda s: int(s))
-    return digits_sorted + nondigits
+    picks_series = filtered["Pick List NO."].map(clean_pick).dropna().astype(str).str.strip()
+    picks_unique = sorted(set(picks_series.tolist()))
+    return picks_unique
 
 if check_password():
     st.set_page_config(page_title="Finish Packing", layout="wide")
@@ -140,7 +85,6 @@ if check_password():
             available_picks = get_available_picks(df_sheet, selected_db)
     except Exception as e:
         st.error(f"❌ Failed to load Google Sheet: {e}")
-        df_sheet = pd.DataFrame()
         available_picks = []
 
     if not available_picks:
