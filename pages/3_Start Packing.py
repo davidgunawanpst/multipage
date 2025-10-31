@@ -36,56 +36,27 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
     return pd.read_csv(StringIO(resp.text))
 
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
-    """
-    Return Pick List numbers for the selected DB where Start Packing is blank.
-    Robust for mixed-type columns (preserves text like 'DMI-Manual-1').
-    """
-    # Work on a copy to avoid side-effects
-    df = df.copy()
-
-    # Normalize column names
+    """Return Pick List numbers for the selected DB where Start Packing is blank."""
     df.columns = df.columns.str.strip()
 
-    required = {"Database", "Pick List NO.", "Start Packing"}
-    if not required.issubset(df.columns):
-        raise ValueError(f"Sheet missing required columns: {', '.join(required)}")
+    if not {"Database", "Pick List NO.", "Start Packing"}.issubset(df.columns):
+        raise ValueError("Sheet missing required columns: Database, Pick List NO., Start Packing")
 
-    # Normalize Database column for safe comparison
-    df["Database"] = df["Database"].astype(str).str.strip()
-
-    # Handle Start Packing: keep NaN as NaN, but prepare string comparisons safely
-    # First, don't coerce to string permanently because that turns NaN into 'nan' strings
-    # We'll create a helper column for stripped Start Packing for comparisons
-    start_packing_raw = df["Start Packing"]
-    # Create a cleaned column where empty-like values become empty string
-    start_packing_clean = start_packing_raw.where(start_packing_raw.notna(), None)
-    start_packing_clean = start_packing_clean.astype(str).str.strip().replace({"None": ""})
-    df["_StartPackingClean"] = start_packing_clean
-
-    # Filter rows where Database matches and Start Packing is blank
     filtered = df[
-        (df["Database"] == selected_db)
-        & ((df["_StartPackingClean"].isna()) | (df["_StartPackingClean"].astype(str).str.strip() == ""))
-    ].copy()
+        (df["Database"].astype(str).str.strip() == selected_db)
+        & (df["Start Packing"].isna() | (df["Start Packing"].astype(str).str.strip() == ""))
+    ]
 
-    # Convert Pick List NO. robustly to string while preserving text values
-    picks_series = (
+    # --- Convert numbers like 11111.0 → '11111' ---
+    picks = (
         filtered["Pick List NO."]
-        .fillna("")           # replace NaN with empty string temporarily
-        .astype(str)          # force all types to str
-        .str.strip()          # trim whitespace
-        .replace({"": None})  # empty -> None so we can drop them
+        .dropna()
+        .apply(lambda x: str(int(x)) if isinstance(x, (float, int)) and x == int(x) else str(x))
+        .str.strip()
+        .unique()
+        .tolist()
     )
-
-    picks = picks_series.dropna().unique().tolist()
-
-    # Sort: numeric-only strings sort by numeric value first, then non-numeric lexicographically
-    def sort_key(x):
-        if x.isdigit():
-            return (0, int(x))
-        return (1, x.lower())
-
-    return sorted(picks, key=sort_key)
+    return sorted(picks)
 
 # --- Main app ---
 if check_password():
@@ -102,25 +73,6 @@ if check_password():
     except Exception as e:
         st.error(f"❌ Failed to load Google Sheet: {e}")
         available_picks = []
-
-    # --- Optional debug expander: uncomment to inspect filtered rows live ---
-    # Helpful when you want to verify why certain pick lists are/are not included.
-    # -------------------------------------------------------------------------
-    # with st.expander("🔎 Debug: show filtered rows for selected DB"):
-    #     try:
-    #         df_tmp = df.copy()
-    #         df_tmp.columns = df_tmp.columns.str.strip()
-    #         df_tmp["_StartPackingClean"] = df_tmp["Start Packing"].where(df_tmp["Start Packing"].notna(), None)
-    #         df_tmp["_StartPackingClean"] = df_tmp["_StartPackingClean"].astype(str).str.strip().replace({"None": ""})
-    #         debug_filtered = df_tmp[
-    #             (df_tmp["Database"].astype(str).str.strip() == selected_db)
-    #             & ((df_tmp["_StartPackingClean"].isna()) | (df_tmp["_StartPackingClean"].astype(str).str.strip() == ""))
-    #         ]
-    #         st.write(f"Filtered row count: {len(debug_filtered)}")
-    #         st.dataframe(debug_filtered.head(500))
-    #     except Exception as ee:
-    #         st.write("Debug load error:", ee)
-    # -------------------------------------------------------------------------
 
     if not available_picks:
         st.warning("No available Pick Lists found for this database.")
