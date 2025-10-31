@@ -35,49 +35,93 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text))
 
+def extract_from_unique_code(unique_code_value: str) -> str | None:
+    """
+    Given a Unique Code like 'DMI|DMI-Manual-1' or 'DMI|3005', return the
+    likely pick identifier (last non-empty segment). Returns None if nothing found.
+    """
+    if unique_code_value is None:
+        return None
+    s = str(unique_code_value).strip()
+    if s == "":
+        return None
+    # split on '|' (or other separators if you want) and take last non-empty piece
+    parts = [p.strip() for p in s.split("|") if p and p.strip() != ""]
+    if not parts:
+        return None
+    return parts[-1]
+
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
     """
     Return Pick List numbers for the selected DB where Start Packing is blank.
-    This version forces everything to string *after* filtering and removes
-    empty-like tokens so textual IDs (e.g. 'DMI-Manual-1') are preserved.
+    If 'Pick List NO.' is empty, try extracting an ID from 'Unique Code'.
+    Preserves text IDs (e.g. 'DMI-Manual-1') and numeric IDs.
     """
     df = df.copy()
+    # normalize headers
     df.columns = df.columns.str.strip()
 
     required = {"Database", "Pick List NO.", "Start Packing"}
+    # 'Unique Code' is optional but used as fallback
     if not required.issubset(df.columns):
         raise ValueError(f"Sheet missing required columns: {', '.join(required)}")
 
-    # Normalize Database for matching
+    # normalize database col
     df["Database"] = df["Database"].astype(str).str.strip()
 
-    # Prepare a StartPacking cleaned column:
-    # Keep NaN as NaN, but also treat 'nan', 'None', and empty strings as blank
+    # Prepare Start Packing cleaned column (treat 'nan','None' as blank)
     start_raw = df["Start Packing"]
-    # Convert real NaN to empty string marker, then strip any whitespace
-    start_as_str = start_raw.fillna("").astype(str).str.strip()
-    # Normalize tokens that represent emptiness
-    start_as_str = start_as_str.replace({"nan": "", "None": "", "NaN": ""})
+    start_as_str = start_raw.fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
     df["_StartPackingClean"] = start_as_str
 
-    # Filter rows where Database matches and Start Packing is blank (empty string after cleaning)
+    # Filter rows by Database and Start Packing blank
     filtered = df[(df["Database"] == selected_db) & (df["_StartPackingClean"] == "")].copy()
 
-    # FORCE pick list values to strings (this preserves textual values like 'DMI-Manual-1')
-    picks_series = filtered["Pick List NO."].fillna("").astype(str).str.strip()
+    # Build candidate pick values:
+    # 1) prefer Pick List NO. if present (non-empty)
+    # 2) otherwise try extracting from Unique Code
+    picks = []
+    for idx, row in filtered.iterrows():
+        raw_pl = row.get("Pick List NO.", None)
+        pl_str = ""
+        if pd.notna(raw_pl):
+            pl_str = str(raw_pl).strip()
+        # treat common empty-like tokens as empty
+        if pl_str.lower() in {"", "nan", "none", "nan.0"}:
+            pl_str = ""
 
-    # Remove empty-like tokens that may have been introduced by astype(str)
-    picks_series = picks_series.replace({"": None, "nan": None, "None": None, "NaN": None})
+        if pl_str != "":
+            candidate = pl_str
+        else:
+            # fallback to Unique Code if available
+            unique_code_val = row.get("Unique Code", None) if "Unique Code" in row.index else None
+            candidate = extract_from_unique_code(unique_code_val)
 
-    picks = picks_series.dropna().unique().tolist()
+        if candidate is None:
+            continue
+        candidate = str(candidate).strip()
+        if candidate == "":
+            continue
+        # normalize further if you want (e.g., remove extra pipes), but keep original text otherwise
+        picks.append(candidate)
 
-    # Sorting: preserve numeric order for purely-digit strings, otherwise lexicographic
-    def sort_key(x):
-        if x.isdigit():
-            return (0, int(x))
-        return (1, x.lower())
+    # unique and stable order:
+    # keep order of first appearance but also produce numeric sort preference
+    seen = {}
+    final = []
+    for p in picks:
+        if p not in seen:
+            seen[p] = True
+            final.append(p)
 
-    return sorted(picks, key=sort_key)
+    # Sorting: put pure-digit strings first ordered numerically, then other strings in original order
+    digits = [x for x in final if x.isdigit()]
+    nondigits = [x for x in final if not x.isdigit()]
+
+    digits_sorted = sorted(digits, key=lambda s: int(s))
+    result = digits_sorted + nondigits
+
+    return result
 
 # --- Main app ---
 if check_password():
@@ -93,11 +137,10 @@ if check_password():
             available_picks = get_available_picks(df, selected_db)
     except Exception as e:
         st.error(f"❌ Failed to load Google Sheet: {e}")
-        df = pd.DataFrame()  # fallback so debug block doesn't crash
+        df = pd.DataFrame()
         available_picks = []
 
     # --- DEBUG: show exactly what was loaded and what rows matched the filter
-    # Keep this visible while debugging. Remove or comment out when done.
     with st.expander("🔎 Debug: raw sheet preview & matched rows (leave open while testing)"):
         try:
             st.subheader("Raw sheet head (first 50 rows)")
@@ -106,13 +149,11 @@ if check_password():
             st.subheader("Column dtypes")
             st.write(df.dtypes.astype(str))
 
-            # Show all rows where Database matches the selected DB (before our Start Packing filter)
             st.subheader(f"All rows with Database == '{selected_db}' (before Start Packing check)")
             db_rows = df[df["Database"].astype(str).str.strip() == selected_db]
             st.write(f"Count: {len(db_rows)}")
             st.dataframe(db_rows.head(200))
 
-            # Show rows that survived our Start Packing blank check
             st.subheader("Rows where Start Packing considered BLANK (should be included)")
             start_raw = df["Start Packing"]
             start_as_str = start_raw.fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
@@ -121,12 +162,23 @@ if check_password():
             st.write(f"Matched count: {len(matched)}")
             st.dataframe(matched.head(500))
 
-            # Show distinct Pick List NO. values found among matched rows
-            st.subheader("Distinct Pick List NO. values among matched rows")
-            distinct = (
-                matched["Pick List NO."].fillna("").astype(str).str.strip().replace({"": None, "nan": None, "None": None})
-            )
-            st.write(distinct.dropna().unique().tolist())
+            st.subheader("Distinct Pick IDs derived from matched rows (Pick List NO. preferred, Unique Code fallback)")
+            derived = []
+            for idx, row in matched.iterrows():
+                raw_pl = row.get("Pick List NO.", None)
+                pl_str = ""
+                if pd.notna(raw_pl):
+                    pl_str = str(raw_pl).strip()
+                if pl_str.lower() in {"", "nan", "none", "nan.0"}:
+                    pl_str = ""
+                if pl_str != "":
+                    derived.append(pl_str)
+                else:
+                    unique_code_val = row.get("Unique Code", None) if "Unique Code" in row.index else None
+                    cand = extract_from_unique_code(unique_code_val)
+                    if cand:
+                        derived.append(cand)
+            st.write(pd.Series(derived).dropna().unique().tolist())
         except Exception as debug_e:
             st.write("Debug error:", debug_e)
 
