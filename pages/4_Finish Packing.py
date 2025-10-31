@@ -13,7 +13,7 @@ WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwJi6C7PDW3ZsoGSGrgK
 
 # --- Google Sheet details (public) ---
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
-SHEET_NAME = "SLA Packing"
+SHEET_NAME = "List All Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 # --- PIC List ---
