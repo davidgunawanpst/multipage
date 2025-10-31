@@ -55,73 +55,59 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
     """
     Return Pick List numbers for the selected DB where Start Packing is blank.
     If 'Pick List NO.' is empty, try extracting an ID from 'Unique Code'.
-    Preserves text IDs (e.g. 'DMI-Manual-1') and numeric IDs.
+    Preserves text IDs (e.g. 'DMI-Manual-1') and cleans floats like 3008.0 → '3008'.
     """
     df = df.copy()
-    # normalize headers
     df.columns = df.columns.str.strip()
 
     required = {"Database", "Pick List NO.", "Start Packing"}
-    # 'Unique Code' is optional but used as fallback
     if not required.issubset(df.columns):
         raise ValueError(f"Sheet missing required columns: {', '.join(required)}")
 
-    # normalize database col
     df["Database"] = df["Database"].astype(str).str.strip()
 
-    # Prepare Start Packing cleaned column (treat 'nan','None' as blank)
-    start_raw = df["Start Packing"]
-    start_as_str = start_raw.fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
+    start_as_str = df["Start Packing"].fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
     df["_StartPackingClean"] = start_as_str
 
-    # Filter rows by Database and Start Packing blank
     filtered = df[(df["Database"] == selected_db) & (df["_StartPackingClean"] == "")].copy()
 
-    # Build candidate pick values:
-    # 1) prefer Pick List NO. if present (non-empty)
-    # 2) otherwise try extracting from Unique Code
     picks = []
-    for idx, row in filtered.iterrows():
+    for _, row in filtered.iterrows():
         raw_pl = row.get("Pick List NO.", None)
         pl_str = ""
+
+        # handle direct value
         if pd.notna(raw_pl):
-            pl_str = str(raw_pl).strip()
-        # treat common empty-like tokens as empty
-        if pl_str.lower() in {"", "nan", "none", "nan.0"}:
+            if isinstance(raw_pl, (float, int)) and raw_pl == int(raw_pl):
+                pl_str = str(int(raw_pl))  # clean numeric like 3008.0 → 3008
+            else:
+                pl_str = str(raw_pl).strip()
+
+        if pl_str.lower() in {"", "nan", "none"}:
             pl_str = ""
 
         if pl_str != "":
             candidate = pl_str
         else:
-            # fallback to Unique Code if available
-            unique_code_val = row.get("Unique Code", None) if "Unique Code" in row.index else None
+            # fallback to Unique Code
+            unique_code_val = row.get("Unique Code", None)
             candidate = extract_from_unique_code(unique_code_val)
 
-        if candidate is None:
-            continue
-        candidate = str(candidate).strip()
-        if candidate == "":
-            continue
-        # normalize further if you want (e.g., remove extra pipes), but keep original text otherwise
-        picks.append(candidate)
+        if candidate and str(candidate).strip() != "":
+            picks.append(str(candidate).strip())
 
-    # unique and stable order:
-    # keep order of first appearance but also produce numeric sort preference
-    seen = {}
-    final = []
+    # unique order preserving
+    seen, final = set(), []
     for p in picks:
         if p not in seen:
-            seen[p] = True
+            seen.add(p)
             final.append(p)
 
-    # Sorting: put pure-digit strings first ordered numerically, then other strings in original order
+    # sort digits numerically, then non-digits
     digits = [x for x in final if x.isdigit()]
     nondigits = [x for x in final if not x.isdigit()]
-
     digits_sorted = sorted(digits, key=lambda s: int(s))
-    result = digits_sorted + nondigits
-
-    return result
+    return digits_sorted + nondigits
 
 # --- Main app ---
 if check_password():
