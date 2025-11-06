@@ -11,8 +11,8 @@ from auth import check_password
 from PIL import Image
 
 # --- WEBHOOK URLs ---
-WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbwJi6C7PDW3ZsoGSGrgKhMcEMMEE4hBVcuiKndyow9ifP7x_Nc_sru--TU_Jf6p8aGM/exec"
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwJi6C7PDW3ZsoGSGrgKhMcEMMEE4hBVcuiKndyow9ifP7x_Nc_sru--TU_Jf6p8aGM/exec"
+WEBHOOK_URL_PHOTO = "https://script.google.com/macros/s/AKfycbxcANYcCq0dU-xz1HgNLIEJ9lRMiwb4UP-yjvW3TiBaR6kFARqevYEm13XjMdxziR7n9w/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbxcANYcCq0dU-xz1HgNLIEJ9lRMiwb4UP-yjvW3TiBaR6kFARqevYEm13XjMdxziR7n9w/exec"
 
 # --- Google Sheet details (public) ---
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
