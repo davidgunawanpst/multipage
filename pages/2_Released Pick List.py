@@ -22,12 +22,10 @@ MANUAL_PICKLIST_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET
 
 # --- STATIC LISTS ---
 pic_list = [
-    "Rikie Dwi Permana",
-    "Idha Akhmad Sucahyo",
-    "Rian Dinata",
-    "Harimurti Krisandki",
-    "Muchamad Mustofa",
-    "Yogie Arie Wibowo"
+    "Abim Priambada",
+    "Maftuh Ikhsan",
+    "Rifka Fahrul Musthofa",
+    "Rudi Haryanto",
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
 
