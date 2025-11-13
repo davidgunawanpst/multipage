@@ -4,15 +4,19 @@ import pandas as pd
 from io import StringIO
 from urllib.parse import quote_plus
 
-# If you use auth, keep this import and the check_password() call below.
-# If you don't have auth.py, remove the import and the conditional.
-from auth import check_password  # keep your auth (comment out if not available)
+# Optional auth import — if you don't have it, comment out the two lines that use check_password.
+try:
+    from auth import check_password
+    USE_AUTH = True
+except Exception:
+    USE_AUTH = False
+    check_password = lambda: True  # dummy
 
 # ----------------------
 # Configuration
 # ----------------------
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
-WORKSHEET_NAME = "List Finish Packing"  # tab name (not encoded here)
+WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
 ADMIN_PICS = [
@@ -31,81 +35,75 @@ MODA_OPTIONS = [
     "Handcarry",
 ]
 
-EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel"]
+# Expected columns we care about (A:G area); 'Concat' is present in your sheet screenshots
+EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
 
 # ----------------------
 # Helpers
 # ----------------------
 @st.cache_data(ttl=300)
 def load_sheet_csv(url: str) -> pd.DataFrame:
-    """Load the Google Sheet (published CSV) into a pandas DataFrame."""
+    """Fetch published CSV and return DataFrame (all columns)."""
     resp = requests.get(url, timeout=20)
     resp.raise_for_status()
-    # read entire sheet CSV then we'll subset to needed columns if present
-    df_all = pd.read_csv(StringIO(resp.text), dtype=object)
-    return df_all
+    df = pd.read_csv(StringIO(resp.text), dtype=object)
+    return df
 
 
-def extract_from_unique_code(unique_code_value) -> str | None:
+def clean_candidate_value(val) -> str | None:
     """
-    If Unique Code looks like 'DMI|DMI-Manual-1' or 'DMI|3005', return last non-empty segment.
-    Otherwise return None.
+    Normalize a candidate pick-list value:
+     - If numeric float or string representing integer (e.g. '3008.0') -> '3008'
+     - If integer -> '123'
+     - If alphanumeric -> keep trimmed string (e.g. 'DMI-Manual-1')
+     - Return None for empty-like values
     """
-    if unique_code_value is None:
+    if pd.isna(val):
         return None
-    s = str(unique_code_value).strip()
+    if isinstance(val, int):
+        return str(val)
+    if isinstance(val, float):
+        if val.is_integer():
+            return str(int(val))
+        s = repr(val)
+        if "." in s:
+            s = s.rstrip("0").rstrip(".")
+        return s
+    s = str(val).strip()
+    if s == "" or s.lower() in {"nan", "none"}:
+        return None
+    # try parse string number like '3008.0'
+    try:
+        fv = float(s)
+        if fv.is_integer():
+            return str(int(fv))
+        s2 = str(fv)
+        if "." in s2:
+            s2 = s2.rstrip("0").rstrip(".")
+        return s2
+    except Exception:
+        return s
+
+
+def extract_from_concat(concat_val) -> str | None:
+    """
+    Concat appears as 'DB|Pick' like 'DMI|3015' or 'PKS|PKS-Manual-1'.
+    Return the last segment after '|' cleaned, or None.
+    """
+    if pd.isna(concat_val):
+        return None
+    s = str(concat_val).strip()
     if s == "":
         return None
-    # split on '|' and return last non-empty part
     parts = [p.strip() for p in s.split("|") if p and p.strip() != ""]
     if not parts:
         return None
-    return parts[-1]
-
-
-def fmt_picklist_value(raw_pl) -> str | None:
-    """
-    Convert a raw Pick List value to a clean string:
-      - numeric floats that are integer-like (3008.0) => '3008'
-      - integers => '123'
-      - strings like '3008.0' => '3008'
-      - preserve non-numeric strings (e.g. 'DMI-Manual-1')
-    Return None if value is empty/NaN.
-    """
-    if pd.isna(raw_pl):
-        return None
-
-    # direct numeric types
-    if isinstance(raw_pl, int):
-        return str(raw_pl)
-    if isinstance(raw_pl, float):
-        if raw_pl.is_integer():
-            return str(int(raw_pl))
-        s = repr(raw_pl)
-        if "." in s:
-            s = s.rstrip("0").rstrip(".")
-        return s
-
-    s_val = str(raw_pl).strip()
-    if s_val.lower() in {"", "nan", "none"}:
-        return None
-
-    # try parse strings like "3008.0" -> 3008
-    try:
-        fv = float(s_val)
-        if fv.is_integer():
-            return str(int(fv))
-        s = str(fv)
-        if "." in s:
-            s = s.rstrip("0").rstrip(".")
-        return s
-    except Exception:
-        # not a float -> keep original trimmed string (preserves alphanumeric picks)
-        return s_val
+    # take last part and clean it
+    return clean_candidate_value(parts[-1])
 
 
 def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list[str]:
-    """Return sorted unique Vessel values for a DB (preserve strings)."""
+    """Return sorted unique Vessel values for a DB (trimmed strings)."""
     if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
     subset = df[df["DB"].astype(str).str.strip() == selected_db]
@@ -114,53 +112,34 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list[str]:
     return sorted(vessels)
 
 
-def get_picklists_for_vessel(df: pd.DataFrame, selected_db: str, selected_vessel: str) -> list[str]:
+def get_picklists_for_vessel_using_concat(df: pd.DataFrame, selected_db: str, selected_vessel: str) -> list[str]:
     """
-    Return pick list identifiers for rows matching DB & Vessel.
-    Will try multiple columns per-row in this order:
-      1) 'Pick List'
-      2) 'Pick List NO.' (if present)
-      3) 'Unique Code' (extract last segment)
-      4) fallback scan across other columns for a candidate
-    Preserves order for non-numeric strings and sorts numeric-only picks numerically first.
+    Build pick list options for a selected DB+Vessel using:
+      1) 'Pick List' column (cleaned)
+      2) fallback to 'Concat' column (extract last segment after '|')
+    Preserves order & uniqueness; numeric-only picks are sorted numerically first,
+    then non-numeric picks kept in their first-seen order.
     """
+    # require DB & Vessel cols
     if not {"DB", "Vessel"}.issubset(df.columns):
         return []
-
-    # candidate columns to try, in order of preference
-    candidate_cols_preferred = ["Pick List", "Pick List NO.", "Unique Code"]
-    candidate_cols = [c for c in candidate_cols_preferred if c in df.columns]
 
     cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip() == selected_vessel)
     rows = df.loc[cond, :]
 
     picks_raw = []
     for _, r in rows.iterrows():
+        # 1) Try Pick List column if present
         candidate = None
-        # try preferred columns
-        for col in candidate_cols:
-            raw_val = r.get(col, None)
-            if raw_val is None or (isinstance(raw_val, float) and pd.isna(raw_val)):
-                continue
-            if col == "Unique Code":
-                candidate = extract_from_unique_code(raw_val)
-            else:
-                candidate = fmt_picklist_value(raw_val)
-            if candidate:
-                break  # found usable value for this row
+        if "Pick List" in r.index:
+            candidate = clean_candidate_value(r.get("Pick List", None))
+        # 2) fallback to Concat column if candidate empty
+        if (candidate is None or str(candidate).strip() == "") and "Concat" in r.index:
+            candidate = extract_from_concat(r.get("Concat", None))
 
-        # fallback: scan other columns for anything plausible
-        if not candidate:
-            for colname in r.index:
-                if colname in candidate_cols:
-                    continue
-                raw_val = r.get(colname, None)
-                if raw_val is None or (isinstance(raw_val, float) and pd.isna(raw_val)):
-                    continue
-                maybe = fmt_picklist_value(raw_val)
-                if maybe:
-                    candidate = maybe
-                    break
+        # 3) Additional fallback: try 'Pick List NO.' if present (some variants)
+        if (candidate is None or str(candidate).strip() == "") and "Pick List NO." in r.index:
+            candidate = clean_candidate_value(r.get("Pick List NO.", None))
 
         if candidate and str(candidate).strip() != "":
             picks_raw.append(str(candidate).strip())
@@ -177,7 +156,6 @@ def get_picklists_for_vessel(df: pd.DataFrame, selected_db: str, selected_vessel
     numeric = [x for x in final_ordered if x.isdigit()]
     non_numeric = [x for x in final_ordered if not x.isdigit()]
 
-    # numeric sorted numerically, then non-numeric in original order
     numeric_sorted = sorted(numeric, key=lambda s: int(s))
     return numeric_sorted + non_numeric
 
@@ -188,17 +166,11 @@ def get_picklists_for_vessel(df: pd.DataFrame, selected_db: str, selected_vessel
 st.set_page_config(page_title="List Finish Packing — Selection", layout="wide")
 st.title("List Finish Packing — Selection")
 
-# Optionally require password/auth if you have auth.py
-use_auth = True
-try:
-    if use_auth:
-        ok = check_password()
-    else:
-        ok = True
-except Exception:
-    # If check_password not available or raises, skip auth (but warn)
+# auth (optional)
+if USE_AUTH:
+    ok = check_password()
+else:
     ok = True
-    st.warning("Auth check skipped (auth.py/check_password not available).")
 
 if not ok:
     st.stop()
@@ -206,15 +178,15 @@ if not ok:
 # Sidebar: Admin PIC
 selected_pic = st.sidebar.selectbox("Select Admin PIC", ADMIN_PICS)
 
-# Load sheet (CSV)
-with st.spinner("Loading Google Sheet (J:O)..."):
+# Load sheet CSV
+with st.spinner("Loading sheet..."):
     try:
         df_all = load_sheet_csv(CSV_URL)
     except Exception as e:
         st.error(f"Failed to load sheet CSV: {e}")
         st.stop()
 
-# Do a case-insensitive mapping of expected columns to what's in the CSV
+# Map expected columns case-insensitively (if the CSV header names differ by case/spacing)
 cols_map = {}
 for c in df_all.columns:
     for exp in EXPECTED_COLS:
@@ -223,53 +195,49 @@ for c in df_all.columns:
 
 missing = [e for e in EXPECTED_COLS if e not in cols_map]
 if missing:
-    st.warning(f"Warning: expected columns not all found in sheet CSV: {missing}. Detected columns: {list(df_all.columns)}")
+    st.info(f"Note: some expected columns not found: {missing}. Available cols: {list(df_all.columns)}")
 
-# Build normalized df with canonical column names where possible
+# rename to canonical names where possible
 df = df_all.rename(columns={v: k for k, v in cols_map.items()})
 
-# Ensure referenced columns exist and are object-typed to avoid unexpected casting
-for col in ["DB", "Pick List", "Vessel", "PIC", "Timestamp", "Urgency"]:
+# Ensure referenced columns exist and treat them as object strings to avoid dtype surprises
+for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
-# DB selection
+# DB select
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 
 # Vessel selection depends on DB
 vessel_options = []
-selected_vessel = "-- Select Vessel --"
 if selected_db and selected_db != "-- Select DB --":
     vessel_options = get_vessels_for_db(df, selected_db)
-    selected_vessel = st.selectbox("Vessel", ["-- Select Vessel --"] + vessel_options)
-else:
-    selected_vessel = st.selectbox("Vessel", ["-- Select Vessel --"])
+selected_vessel = st.selectbox("Vessel", ["-- Select Vessel --"] + vessel_options)
 
-# Pick List multiselect depends on Vessel (and DB)
+# Build picklist options using Pick List + Concat
 picklist_options = []
 if selected_db and selected_db != "-- Select DB --" and selected_vessel and selected_vessel != "-- Select Vessel --":
-    picklist_options = get_picklists_for_vessel(df, selected_db, selected_vessel)
+    picklist_options = get_picklists_for_vessel_using_concat(df, selected_db, selected_vessel)
 
-# Debug expander showing raw candidate columns for selected DB+Vessel
-with st.expander("🔎 Debug: raw candidate columns for selected DB+Vessel"):
+# Debug: show raw A:G area for selected DB+Vessel to inspect where strings live
+with st.expander("🔎 Debug: raw A:G rows for selected DB+Vessel"):
     if selected_db and selected_db != "-- Select DB --" and selected_vessel and selected_vessel != "-- Select Vessel --":
         cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip() == selected_vessel)
         debug_rows = df.loc[cond, :]
-        # show the commonly used columns if present
-        debug_cols = debug_rows.columns.tolist()
-        if not debug_cols:
-            st.write("No candidate columns (Pick List / Pick List NO. / Unique Code) present in the matching rows.")
+        # pick columns A:G if available, else show all columns for clarity
+        cols_a_to_g = [c for c in ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"] if c in debug_rows.columns]
+        if cols_a_to_g:
+            st.dataframe(debug_rows[cols_a_to_g].head(200))
         else:
-            st.dataframe(debug_rows[debug_cols].head(200))
+            st.dataframe(debug_rows.head(200))
     else:
-        st.write("Select DB and Vessel to preview rows.")
+        st.write("Select DB and Vessel to preview these rows.")
 
+# Multi-select pick lists
 selected_picklists = st.multiselect("Pick List (choose one or more)", options=picklist_options)
 
-# Tujuan input
+# Tujuan and Moda Pengiriman
 tujuan = st.text_input("Tujuan")
-
-# Moda Pengiriman
 moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
 
 st.divider()
@@ -283,9 +251,8 @@ st.write({
     "Moda Pengiriman": moda,
 })
 
-# Placeholder action button
+# Placeholder action button (no write-back)
 if st.button("Proceed / Save (placeholder)"):
-    # basic validation
     errors = []
     if selected_db in ("", "-- Select DB --"):
         errors.append("Please select DB.")
@@ -311,10 +278,10 @@ if st.button("Proceed / Save (placeholder)"):
             "moda": moda,
         })
 
-# Preview loaded rows (relevant columns)
-with st.expander("Preview loaded data (relevant columns)"):
-    preview_cols = [c for c in EXPECTED_COLS if c in df.columns]
+# Preview relevant columns
+with st.expander("Preview loaded data (A:G if available)"):
+    preview_cols = [c for c in ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"] if c in df.columns]
     if preview_cols:
         st.dataframe(df[preview_cols].head(200))
     else:
-        st.write("No expected columns found to preview.")
+        st.write("No A:G columns found to preview.")
