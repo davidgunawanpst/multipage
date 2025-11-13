@@ -176,7 +176,7 @@ if not ok:
     st.stop()
 
 # Sidebar: Admin PIC
-selected_pic = st.sidebar.selectbox("Select Admin PIC", ADMIN_PICS)
+selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 
 # Load sheet CSV
 with st.spinner("Loading sheet..."):
