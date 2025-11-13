@@ -5,7 +5,7 @@ import pandas as pd
 # Configuration
 # ----------------------
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
-WORKSHEET_NAME = "Generator Matrix"
+WORKSHEET_NAME = "List Finish Packing"
 RANGE = "J:O"  # ignored in this method, since we'll import full sheet
 
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={WORKSHEET_NAME}"
