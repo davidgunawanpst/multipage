@@ -256,7 +256,7 @@ with st.expander("🔎 Debug: raw candidate columns for selected DB+Vessel"):
         cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip() == selected_vessel)
         debug_rows = df.loc[cond, :]
         # show the commonly used columns if present
-        debug_cols = [c for c in ["Pick List", "Pick List NO.", "Unique Code"] if c in debug_rows.columns]
+        debug_cols = debug_rows.columns.tolist()
         if not debug_cols:
             st.write("No candidate columns (Pick List / Pick List NO. / Unique Code) present in the matching rows.")
         else:
