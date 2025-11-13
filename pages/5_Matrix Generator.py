@@ -163,8 +163,8 @@ def get_picklists_for_vessel_using_concat(df: pd.DataFrame, selected_db: str, se
 # ----------------------
 # App UI
 # ----------------------
-st.set_page_config(page_title="List Finish Packing — Selection", layout="wide")
-st.title("List Finish Packing — Selection")
+st.set_page_config(page_title="Matrix Genereator", layout="wide")
+st.title("Matrix Generator")
 
 # auth (optional)
 if USE_AUTH:
