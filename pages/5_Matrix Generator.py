@@ -22,7 +22,7 @@ MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz
 ADMIN_PICS = [
     "Abim Priambada",
     "Maftuh Ikhsan",
-    "Rifka Fahrul Musthofa",
+    "Fahrul",
     "Rudi Haryanto",
 ]
 
@@ -37,7 +37,7 @@ ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 PIC_SHORTNAME = {
     "Abim Priambada": "ABIM",
     "Maftuh Ikhsan": "MAFTUH",
-    "Rifka Fahrul Musthofa": "FAHRUL",
+    "Fahrul": "FAHRUL",
     "Rudi Haryanto": "RUDI",
 }
 
