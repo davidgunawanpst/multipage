@@ -350,65 +350,59 @@ with st.expander("Preview loaded data (A:G if available)"):
     else:
         st.dataframe(df.head(200))
 
-# --- Diagnostic block: paste into your Matrix expander just before generation ---
-import re
-st.write("**Diagnostic: PENOMORAN-MATRIX PIC matching**")
+# DIAGNOSTIC: paste into your Matrix expander and run the Generate button (or just run)
+import pandas as pd
+import numpy as np
+import html
 
-# confirm df_matrix exists and shape
-st.write("Matrix DF loaded rows:", None if 'df_matrix' not in globals() else df_matrix.shape)
+st.write("### Diagnostic: df_matrix quick inspection")
 
-# find pic column robustly
-pic_col = None
-if 'df_matrix' in globals():
+if 'df_matrix' not in globals():
+    st.error("df_matrix not found in globals — sheet not loaded.")
+else:
+    st.write("df_matrix.shape:", df_matrix.shape)
+    st.write("df_matrix.columns (exact):")
+    for i, c in enumerate(df_matrix.columns):
+        st.write(f"{i:02d} : {repr(c)}")
+
+    # robust PIC column detection (print candidates)
     cols_lower = {c.strip().lower(): c for c in df_matrix.columns}
-    for key in ["pic", "person in charge", "penanggung jawab"]:
-        if key in cols_lower:
-            pic_col = cols_lower[key]
-            break
-    if pic_col is None:
-        # fallback: any column name containing "pic"
+    pic_col = None
+    if "pic" in cols_lower:
+        pic_col = cols_lower["pic"]
+    else:
+        # any column containing substring 'pic'
         for c in df_matrix.columns:
             if "pic" in c.lower():
                 pic_col = c
                 break
 
-st.write("Detected PIC column:", pic_col)
+    st.write("Detected PIC column (by heuristics):", repr(pic_col))
 
-if pic_col and 'df_matrix' in globals():
-    raw_series = df_matrix[pic_col].astype(object).fillna("").astype(str)
-    st.subheader("Sample PIC values (first 50)")
-    st.write(raw_series.head(50).tolist())
-    st.subheader("Unique PIC value counts (top 50)")
-    st.write(raw_series.value_counts().head(50))
+    if pic_col is None:
+        st.warning("No PIC-like column found. Look at the column names above and tell me which one is PIC.")
+    else:
+        s = df_matrix[pic_col].astype(object).fillna("").astype(str)
+        st.write("First 100 PIC values with repr (shows hidden chars):")
+        sample = [repr(x) for x in s.head(100).tolist()]
+        st.write(sample)
 
-    target = str(selected_pic)
-    def collapse_spaces(s): return " ".join(s.split())
-    def remove_spaces(s): return "".join(s.split())
-    # prepared normalized series
-    v_strip = raw_series.str.strip()
-    v_up_collapsed = v_strip.apply(collapse_spaces).str.upper()
-    v_up_nospaces = v_strip.apply(remove_spaces).str.upper()
-    v_up_raw = v_strip.str.upper()
+        st.write("Unique PIC values (repr) and counts — full list:")
+        vc = s.value_counts(dropna=False)
+        # present entire list if not huge
+        vc_df = pd.DataFrame({"value": vc.index.tolist(), "count": vc.values.tolist()})
+        # show repr of values
+        vc_df["value_repr"] = vc_df["value"].apply(lambda x: repr(x))
+        st.dataframe(vc_df[["value_repr", "count"]])
 
-    t_strip = target.strip()
-    t_up_collapsed = collapse_spaces(t_strip).upper()
-    t_up_nospaces = remove_spaces(t_strip).upper()
-    t_up_raw = t_strip.upper()
-
-    counts = {
-        "raw_exact": int((raw_series == target).sum()),
-        "strip_exact": int((v_strip == t_strip).sum()),
-        "upper+collapsed": int((v_up_collapsed == t_up_collapsed).sum()),
-        "upper+nospaces": int((v_up_nospaces == t_up_nospaces).sum()),
-        "upper+raw": int((v_up_raw == t_up_raw).sum())
-    }
-    st.write("Counts by strategy:", counts)
-
-    # fuzzy tokens
-    tokens = [t.upper() for t in re.findall(r"\w+", t_strip)]
-    fuzzy_count = int(raw_series.apply(lambda s: all(tok in s.upper() for tok in tokens)).sum()) if tokens else 0
-    st.write("fuzzy_token_contains_count:", fuzzy_count)
-
-else:
-    st.warning("df_matrix or PIC column not found — check sheet loaded and header names.")
-
+        # show rows that are NOT the most common value (helps spot other names)
+        if len(vc_df) > 0:
+            top_val = vc_df.iloc[0]["value"]
+            st.write(f"Top value: {repr(top_val)} (count {vc_df.iloc[0]['count']})")
+            not_top = df_matrix[df_matrix[pic_col].astype(str) != top_val]
+            st.write(f"Rows where {pic_col} != top_value (show up to 50): count = {len(not_top)}")
+            if len(not_top) > 0:
+                display_cols = df_matrix.columns[:10].tolist()  # keep small
+                st.dataframe(not_top[display_cols].head(50))
+        else:
+            st.write("No values found in PIC column.")
