@@ -231,6 +231,7 @@ if st.button("Commit"):
             "ACTIVITY": selected_activity,
             "Vessel Name": "-".join(selected_vessels),
             "Moda Pengiriman": moda
+            "Tujuan Pengiriman": tujuan
         }
         st.json(payload)
 
