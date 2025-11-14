@@ -286,7 +286,7 @@ st.write({
 # Matrix generator UI (COUNTIF PIC strictly, seq width fixed)
 st.markdown("### Matrix number")
 with st.expander("Generate Nomor Matrix"):
-    chosen_date = datetime.today().strftime("%d-%m-%Y")
+    chosen_date = datetime.now().date())
     if st.button("Generate Matrix Number"):
         try:
             # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
