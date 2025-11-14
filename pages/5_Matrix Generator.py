@@ -152,13 +152,13 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
 def _normalize_pic_for_count(raw_pic) -> str:
-    """Normalize PIC string for counting: trim, collapse spaces, uppercase."""
+    """Normalize PIC string for counting: trim, collapse spaces."""
     if pd.isna(raw_pic):
         return ""
     s = str(raw_pic).strip()
     # collapse multiple spaces
     s = " ".join(s.split())
-    return s.upper()
+    return s
 
 def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
     """
