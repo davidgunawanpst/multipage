@@ -238,7 +238,7 @@ if st.button("Commit"):
         # placeholder for sending to Apps Script
         try:
             response = requests.post(WEBHOOK_URL, json=payload)
-            t.success(f"Committed successfully: {response.status_code}")
+            st.success(f"Committed successfully: {response.status_code}")
             st.info(f"Payload ready to send to Apps Script: {WEBHOOK_URL}")
         except Exception as e:
             st.error(f"Failed to send payload: {e}")
