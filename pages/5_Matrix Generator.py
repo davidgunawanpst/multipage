@@ -163,7 +163,7 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
 def _normalize_pic_for_count(raw_pic) -> str:
-    """Normalize PIC string for counting: trim, collapse spaces, uppercase for robust matching."""
+    """Normalize PIC string for counting: trim, collapse spaces for robust matching."""
     if pd.isna(raw_pic):
         return ""
     s = str(raw_pic).strip()
@@ -349,3 +349,66 @@ with st.expander("Preview loaded data (A:G if available)"):
         st.dataframe(df[preview_cols].head(200))
     else:
         st.dataframe(df.head(200))
+
+# --- Diagnostic block: paste into your Matrix expander just before generation ---
+import re
+st.write("**Diagnostic: PENOMORAN-MATRIX PIC matching**")
+
+# confirm df_matrix exists and shape
+st.write("Matrix DF loaded rows:", None if 'df_matrix' not in globals() else df_matrix.shape)
+
+# find pic column robustly
+pic_col = None
+if 'df_matrix' in globals():
+    cols_lower = {c.strip().lower(): c for c in df_matrix.columns}
+    for key in ["pic", "person in charge", "penanggung jawab"]:
+        if key in cols_lower:
+            pic_col = cols_lower[key]
+            break
+    if pic_col is None:
+        # fallback: any column name containing "pic"
+        for c in df_matrix.columns:
+            if "pic" in c.lower():
+                pic_col = c
+                break
+
+st.write("Detected PIC column:", pic_col)
+
+if pic_col and 'df_matrix' in globals():
+    raw_series = df_matrix[pic_col].astype(object).fillna("").astype(str)
+    st.subheader("Sample PIC values (first 50)")
+    st.write(raw_series.head(50).tolist())
+    st.subheader("Unique PIC value counts (top 50)")
+    st.write(raw_series.value_counts().head(50))
+
+    target = str(selected_pic)
+    def collapse_spaces(s): return " ".join(s.split())
+    def remove_spaces(s): return "".join(s.split())
+    # prepared normalized series
+    v_strip = raw_series.str.strip()
+    v_up_collapsed = v_strip.apply(collapse_spaces).str.upper()
+    v_up_nospaces = v_strip.apply(remove_spaces).str.upper()
+    v_up_raw = v_strip.str.upper()
+
+    t_strip = target.strip()
+    t_up_collapsed = collapse_spaces(t_strip).upper()
+    t_up_nospaces = remove_spaces(t_strip).upper()
+    t_up_raw = t_strip.upper()
+
+    counts = {
+        "raw_exact": int((raw_series == target).sum()),
+        "strip_exact": int((v_strip == t_strip).sum()),
+        "upper+collapsed": int((v_up_collapsed == t_up_collapsed).sum()),
+        "upper+nospaces": int((v_up_nospaces == t_up_nospaces).sum()),
+        "upper+raw": int((v_up_raw == t_up_raw).sum())
+    }
+    st.write("Counts by strategy:", counts)
+
+    # fuzzy tokens
+    tokens = [t.upper() for t in re.findall(r"\w+", t_strip)]
+    fuzzy_count = int(raw_series.apply(lambda s: all(tok in s.upper() for tok in tokens)).sum()) if tokens else 0
+    st.write("fuzzy_token_contains_count:", fuzzy_count)
+
+else:
+    st.warning("df_matrix or PIC column not found — check sheet loaded and header names.")
+
