@@ -275,10 +275,6 @@ st.divider()
 
 # ----------------------
 # MATRIX GENERATOR (visible in main UI, date fixed to today)
-# ----------------------
-st.markdown("### Matrix number")
-st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
-
 # Show selected PIC/DB/Activity summary right above the button for clarity
 st.write("Generate next NOMOR MATRIX for this PIC")
 if st.button("Generate Matrix Number"):
