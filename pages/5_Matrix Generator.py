@@ -176,10 +176,10 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
 # ----------------------
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
-def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
+def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activity: str, use_date: datetime = None, seq_width: int = SEQ_WIDTH) -> str:
     """
     Generate next NOMOR MATRIX strictly by COUNTIF PIC from df_matrix (PENOMORAN-MATRIX).
-    - Counts rows where PIC (normalized) == selected pic (normalized), then next_seq = count + 1.
+    - Counts rows where PIC == selected pic (exact match), then next_seq = count + 1.
     - Uses PIC_SHORTNAME mapping for short name in the generated string.
     - If activity == "Delivery" -> token "DEL", else -> "OTHER".
     - Format: MATRIX - 026-<TOKEN>-<PicShort>-<DB>-<ROMANMONTH>-<YEAR>
@@ -190,20 +190,14 @@ def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activ
     year = use_date.year
 
     # detect PIC column name (case-insensitive)
-    pic_col = None
-    for c in df_matrix.columns:
-        if c.strip().lower() == "pic":
-            pic_col = c
-            break
+    pic_col = next((c for c in df_matrix.columns if c.strip().lower() == "pic"), None)
 
     if pic_col is None:
         count_for_pic = 0
     else:
         try:
-            # strict trim-normalized comparison: strip both sides
-            target = str(pic).strip()
-            series = df_matrix[pic_col].astype(object).fillna("").apply(lambda x: str(x).strip())
-            count_for_pic = int(series.eq(target).sum())
+            # exact match count
+            count_for_pic = int((df_matrix[pic_col] == pic).sum())
         except Exception:
             count_for_pic = 0
 
@@ -211,9 +205,7 @@ def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activ
     seq_str = str(next_seq).zfill(seq_width)
 
     # PIC short name for final string: look up mapping, fallback to cleaned uppercase-without-spaces if missing
-    pic_short = PIC_SHORTNAME.get(pic, None)
-    if not pic_short:
-        pic_short = str(pic).strip().replace(" ", "")
+    pic_short = PIC_SHORTNAME.get(pic, str(pic).replace(" ", ""))
     # activity token: Delivery -> DEL else OTHER
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
@@ -221,7 +213,6 @@ def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activ
 
     matrix_str = f"MATRIX - {seq_str}-{token}-{pic_short}-{db_for_str}-{month_rom}-{year}"
     return matrix_str
-
 # ----------------------
 # App UI
 # ----------------------
