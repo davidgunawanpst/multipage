@@ -1,23 +1,6 @@
-"""
-Streamlit app — Pick lists + Matrix number generator (no auth; public sheets)
-
-What it does:
-- Loads "List Finish Packing" (sheet J:O but reads entire CSV) from a public Google Sheet.
-- Loads "PENOMORAN-MATRIX" (matrix numbering table) from a second public Google Sheet.
-- Lets user pick Admin PIC, DB, one-or-more Vessels, then shows Pick Lists (multi-select) derived from selected vessels.
-  - Pick lists are collected from "Pick List" column, with fallback to "Concat" column (A:G) and "Pick List NO." if present.
-  - Numeric pick lists like 3008.0 are cleaned to "3008". String picks (e.g. DMI-Manual-1) are preserved.
-- Inputs Tujuan and Moda Pengiriman.
-- Generates the next NOMOR MATRIX for the chosen PIC (based on rows in the PENOMORAN-MATRIX sheet).
-- No write-back implemented (placeholder button present).
-
-Drop this file into your Streamlit app and run: `streamlit run app.py`
-"""
-
 import streamlit as st
 import requests
 import pandas as pd
-import re
 from io import StringIO
 from urllib.parse import quote_plus
 from datetime import datetime
@@ -30,11 +13,12 @@ SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
-# matrix numbering sheet (public)
+# matrix numbering sheet (public) — PENOMORAN-MATRIX
 MATRIX_SHEET_ID = "1d9nYJEqus6B4f_W1OrRYYo3mZuYbh9lRkSM7-ywNsCk"
 MATRIX_SHEET_NAME = "PENOMORAN-MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
+# static lists
 ADMIN_PICS = [
     "Abim Priambada",
     "Maftuh Ikhsan",
@@ -46,7 +30,11 @@ DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
 
+# expected columns to map (case-insensitive)
 EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
+
+# fixed sequence width (default 3 as requested)
+SEQ_WIDTH = 3
 
 # ----------------------
 # Utilities
@@ -100,7 +88,7 @@ def _extract_from_concat(concat_val):
     return _clean_candidate_value(parts[-1])
 
 def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
-    """Return sorted unique Vessel values for a DB."""
+    """Return sorted unique Vessel values for a DB (trim whitespace)."""
     if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
     subset = df[df["DB"].astype(str).str.strip() == selected_db]
@@ -109,7 +97,10 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     return sorted(vessels)
 
 def get_picklists_for_vessel_using_concat(df: pd.DataFrame, selected_db: str, selected_vessel: str) -> list:
-    """Collect picklist IDs for rows matching DB+Vessel using Pick List, Concat, or Pick List NO."""
+    """
+    Collect picklist IDs for rows matching DB+Vessel using Pick List, Concat, or Pick List NO.
+    Returns unique picks in stable order: numeric picks sorted numerically first, then non-numeric in first-seen order.
+    """
     if not {"DB", "Vessel"}.issubset(df.columns):
         return []
     cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip() == selected_vessel)
@@ -156,63 +147,68 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
     return numeric_sorted + non_numeric
 
 # ----------------------
-# Matrix number helpers (use matrix sheet DF)
+# Matrix numbering (STRICTLY using COUNTIF PIC from PENOMORAN-MATRIX)
 # ----------------------
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
-def _find_nomor_matrix_column(df: pd.DataFrame) -> str | None:
-    cols_lower = {c.lower(): c for c in df.columns}
-    if "nomor matrix" in cols_lower:
-        return cols_lower["nomor matrix"]
-    # fallback any col containing both words
-    for c in df.columns:
-        low = c.lower()
-        if "nomor" in low and "matrix" in low:
-            return c
-    return None
+def _normalize_pic_for_count(raw_pic) -> str:
+    """Normalize PIC string for counting: trim, collapse spaces, uppercase."""
+    if pd.isna(raw_pic):
+        return ""
+    s = str(raw_pic).strip()
+    # collapse multiple spaces
+    s = " ".join(s.split())
+    return s.upper()
 
-def _extract_seq_from_nomor_matrix(nomor_str: str) -> int | None:
-    if not nomor_str or not isinstance(nomor_str, str):
-        return None
-    m = re.search(r"matrix\s*[-]\s*(\d+)\s*[-]\s*del", nomor_str, flags=re.I)
-    if not m:
-        m = re.search(r"matrix\s*[-]\s*(\d+)", nomor_str, flags=re.I)
-    if m:
-        try:
-            return int(m.group(1))
-        except Exception:
-            return None
-    return None
-
-def next_matrix_number_from_df(df_matrix: pd.DataFrame, pic: str, db: str, use_date: datetime | None = None, seq_width: int = 3) -> str:
-    """Compute next NOMOR MATRIX based on existing matrix table (df_matrix)."""
+def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
+    """
+    Generate next NOMOR MATRIX strictly by COUNTIF PIC from df_matrix (PENOMORAN-MATRIX).
+    - Counts rows where PIC (normalized) == selected pic (normalized), then next_seq = count + 1.
+    - Format: MATRIX - 026-DEL-PICDB-<DB>-<ROMANMONTH>-<YEAR>
+      PIC in this formatted string will be uppercase, spaces removed (per your example).
+    """
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
-    pic_norm_for_str = str(pic).strip().upper().replace(" ", "")
-    db_norm = str(db).strip().upper()
 
-    # find columns
+    # normalize pic for comparison
+    target_pic_norm = _normalize_pic_for_count(pic)
+
+    # try to detect PIC column name (case-insensitive)
     cols_lower = {c.lower(): c for c in df_matrix.columns}
-    pic_col = cols_lower.get("pic", None)
-    nm_col = _find_nomor_matrix_column(df_matrix)
+    pic_col = None
+    for cand in ["pic", "PIC", "Pic"]:
+        if cand.lower() in cols_lower:
+            pic_col = cols_lower[cand.lower()]
+            break
+    if pic_col is None:
+        # fallback: any column named 'pic' ignoring case/spacing
+        for c in df_matrix.columns:
+            if c.strip().lower() == "pic":
+                pic_col = c
+                break
 
-    seqs = []
-    if nm_col and pic_col:
-        mask = df_matrix[pic_col].astype(str).str.strip().str.upper() == str(pic).strip().upper()
-        for val in df_matrix.loc[mask, nm_col].astype(object).tolist():
-            seq = _extract_seq_from_nomor_matrix(val)
-            if seq is not None:
-                seqs.append(seq)
-    elif pic_col:
-        count_for_pic = int(df_matrix[pic_col].astype(str).str.strip().str.upper().eq(str(pic).strip().upper()).sum())
-        seqs.append(count_for_pic)
+    # If pic_col not found, treat count as zero (next will be 1)
+    if pic_col is None:
+        count_for_pic = 0
+    else:
+        try:
+            series = df_matrix[pic_col].astype(object).fillna("").apply(_normalize_pic_for_count)
+            count_for_pic = int(series.eq(target_pic_norm).sum())
+        except Exception:
+            # safe fallback
+            count_for_pic = 0
 
-    max_seq = max(seqs) if seqs else 0
-    next_seq = max_seq + 1
+    next_seq = count_for_pic + 1
     seq_str = str(next_seq).zfill(seq_width)
-    matrix_str = f"MATRIX - {seq_str} - DEL - {pic_norm_for_str} - {db_norm} - {month_rom} - {year}"
+
+    # PIC in final string: uppercase and remove spaces (as your example shows)
+    pic_for_str = str(pic).strip().upper().replace(" ", "")
+
+    db_for_str = str(db).strip().upper()
+
+    matrix_str = f"MATRIX - {seq_str}-DEL-{pic_for_str}-{db_for_str}-{month_rom}-{year}"
     return matrix_str
 
 # ----------------------
@@ -221,7 +217,7 @@ def next_matrix_number_from_df(df_matrix: pd.DataFrame, pic: str, db: str, use_d
 st.set_page_config(page_title="Matrix Generator (Pick Lists)", layout="wide")
 st.title("Matrix Generator — Pick Lists & Numbering")
 
-# Load both sheets
+# Load both sheets (public)
 with st.spinner("Loading sheets..."):
     try:
         df_main = load_sheet_csv(CSV_URL)
@@ -247,11 +243,11 @@ for col in ["DB","Pick List","Vessel","Concat","PIC","Timestamp","Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
-# MAIN INPUTS (PIC on main page)
+# Main inputs
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 
-# Vessel multi-select (based on DB)
+# Vessel multiselect (based on DB)
 vessel_options = []
 if selected_db and selected_db != "-- Select DB --":
     vessel_options = get_vessels_for_db(df, selected_db)
@@ -279,14 +275,20 @@ st.write({
     "Moda Pengiriman": moda,
 })
 
-# Matrix generator UI (uses df_matrix)
+# Matrix generator UI (COUNTIF PIC strictly, seq width fixed)
 st.markdown("### Matrix number")
-with st.expander("Generate next NOMOR MATRIX for this PIC (from PENOMORAN-MATRIX sheet)"):
+with st.expander("Generate next NOMOR MATRIX for this PIC (COUNTIF PIC from PENOMORAN-MATRIX)"):
     chosen_date = st.date_input("Matrix Date (used to build month/year)", value=datetime.now().date())
-    seq_width = st.number_input("Sequence zero-pad width", min_value=1, max_value=6, value=3, step=1)
+    st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
     if st.button("Generate Matrix Number"):
         try:
-            matrix_number = next_matrix_number_from_df(df_matrix, pic=selected_pic, db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN", use_date=datetime.combine(chosen_date, datetime.min.time()), seq_width=seq_width)
+            matrix_number = next_matrix_number_countif(
+                df_matrix,
+                pic=selected_pic,
+                db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
+                use_date=datetime.combine(chosen_date, datetime.min.time()),
+                seq_width=SEQ_WIDTH,
+            )
             st.success("Generated: " + matrix_number)
             st.code(matrix_number)
         except Exception as e:
