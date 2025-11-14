@@ -285,9 +285,8 @@ st.write({
 
 # Matrix generator UI (COUNTIF PIC strictly, seq width fixed)
 st.markdown("### Matrix number")
-with st.expander("Generate next NOMOR MATRIX for this PIC (COUNTIF PIC from PENOMORAN-MATRIX)"):
-    chosen_date = st.date_input("Matrix Date (used to build month/year)", value=datetime.now().date())
-    st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
+with st.expander("Generate Nomor Matrix"):
+    chosen_date = datetime.today().strftime("%d-%m-%Y")
     if st.button("Generate Matrix Number"):
         try:
             # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
