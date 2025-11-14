@@ -212,7 +212,7 @@ def next_matrix_number_from_df(df_matrix: pd.DataFrame, pic: str, db: str, use_d
     max_seq = max(seqs) if seqs else 0
     next_seq = max_seq + 1
     seq_str = str(next_seq).zfill(seq_width)
-    matrix_str = f"MATRIX - {seq_str}-DEL-{pic_norm_for_str}-{db_norm}-{month_rom}-{year}"
+    matrix_str = f"MATRIX - {seq_str} - DEL - {pic_norm_for_str} - {db_norm} - {month_rom} - {year}"
     return matrix_str
 
 # ----------------------
