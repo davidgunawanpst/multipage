@@ -272,16 +272,6 @@ tujuan = st.text_input("Tujuan")
 moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
 
 st.divider()
-st.subheader("Selection Summary")
-st.write({
-    "Admin PIC": selected_pic,
-    "DB": selected_db,
-    "Activity": selected_activity,
-    "Vessel(s)": selected_vessels,
-    "Pick List(s)": selected_picklists,
-    "Tujuan": tujuan,
-    "Moda Pengiriman": moda,
-})
 
 # ----------------------
 # MATRIX GENERATOR (visible in main UI, date fixed to today)
@@ -291,12 +281,6 @@ st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
 
 # Show selected PIC/DB/Activity summary right above the button for clarity
 st.write("Generate next NOMOR MATRIX for this PIC")
-st.write({
-    "Admin PIC": selected_pic,
-    "DB": selected_db,
-    "Activity": selected_activity,
-})
-
 if st.button("Generate Matrix Number"):
     try:
         # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
