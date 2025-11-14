@@ -283,28 +283,41 @@ st.write({
     "Moda Pengiriman": moda,
 })
 
-# Matrix generator UI (COUNTIF PIC strictly, seq width fixed)
+# ----------------------
+# MATRIX GENERATOR (visible in main UI, date fixed to today)
+# ----------------------
 st.markdown("### Matrix number")
-with st.expander("Generate next NOMOR MATRIX for this PIC (COUNTIF PIC from PENOMORAN-MATRIX)"):
-    chosen_date = st.date_input("Matrix Date (used to build month/year)", value=datetime.now().date())
-    st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
-    if st.button("Generate Matrix Number"):
-        try:
-            # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
-            df_matrix = load_sheet_csv_fresh(MATRIX_CSV_URL)
+st.write(f"Sequence zero-pad width is fixed to {SEQ_WIDTH}.")
 
-            matrix_number = next_matrix_number_countif(
-                df_matrix,
-                pic=selected_pic,
-                db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
-                activity=selected_activity,
-                use_date=datetime.combine(chosen_date, datetime.min.time()),
-                seq_width=SEQ_WIDTH,
-            )
-            st.success("Generated: " + matrix_number)
-            st.code(matrix_number)
-        except Exception as e:
-            st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
+# Show selected PIC/DB/Activity summary right above the button for clarity
+st.write("Generate next NOMOR MATRIX for this PIC")
+st.write({
+    "Admin PIC": selected_pic,
+    "DB": selected_db,
+    "Activity": selected_activity,
+})
+
+if st.button("Generate Matrix Number"):
+    try:
+        # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
+        df_matrix = load_sheet_csv_fresh(MATRIX_CSV_URL)
+
+        # use today's date (no user input)
+        today_dt = datetime.now()
+        use_date = datetime.combine(today_dt.date(), datetime.min.time())
+
+        matrix_number = next_matrix_number_countif(
+            df_matrix,
+            pic=selected_pic,
+            db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
+            activity=selected_activity,
+            use_date=use_date,
+            seq_width=SEQ_WIDTH,
+        )
+        st.success("Generated: " + matrix_number)
+        st.code(matrix_number)
+    except Exception as e:
+        st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
 
 # Placeholder Submit / Save
 if st.button("Proceed / Save (placeholder)"):
