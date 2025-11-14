@@ -23,6 +23,9 @@ MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz
 MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
+# webhook URL
+WEBHOOK_URL = "https://script.google.com/macros/s/your-script-id/exec"  # Replace later
+
 # static lists
 ADMIN_PICS = [
     "Abim Priambada",
@@ -180,53 +183,62 @@ tujuan = st.text_input("Tujuan")
 moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
 
 st.divider()
+st.write("Commit Nomor Matrix dan Rencana Pengiriman")
 
 # MATRIX GENERATOR
-st.write("Generate next NOMOR MATRIX for this PIC")
+if "matrix_number" not in st.session_state:
+    st.session_state.matrix_number = None
+
+st.write("Generate Nomor Matrix")
+matrix_generated = st.session_state.matrix_number
+
 if st.button("Generate Matrix Number"):
     try:
+        # --- FETCH FRESH MATRIX SHEETS ON DEMAND (both sheets) ---
         df_matrix_a = load_sheet_csv_fresh(MATRIX_CSV_URL)
         df_matrix_b = load_sheet_csv_fresh(MATRIX2_CSV_URL)
+
+        # use today's date (no user input)
         today_dt = datetime.now()
         use_date = datetime.combine(today_dt.date(), datetime.min.time())
 
         matrix_number = next_matrix_number_countif_multi(
-            df_matrix_a,
-            df_matrix_b,
+            df_matrix_a, df_matrix_b,
             pic=selected_pic,
-            db=selected_db if selected_db != "-- Select DB --" else "UNKNOWN",
+            db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
             activity=selected_activity,
             use_date=use_date,
             seq_width=SEQ_WIDTH,
         )
+        st.session_state.matrix_number = matrix_number
         st.success("Generated: " + matrix_number)
         st.code(matrix_number)
     except Exception as e:
-        st.error(f"Failed to generate matrix number: {e}")
+        st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
 
-# Placeholder save
-if st.button("Proceed / Save (placeholder)"):
-    errors = []
-    if selected_db in ("", "-- Select DB --"): errors.append("Please select DB.")
-    if not selected_vessels: errors.append("Please select at least one Vessel.")
-    if not selected_picklists: errors.append("Please select at least one Pick List.")
-    if not tujuan: errors.append("Please enter Tujuan.")
-    if moda in ("", "-- Select Moda --"): errors.append("Please select Moda Pengiriman.")
-    if errors:
-        st.error("Validation failed:\n- " + "\n- ".join(errors))
+# Commit / Send button
+if st.button("Commit"):
+    if not st.session_state.matrix_number:
+        st.error("Please generate a Matrix Number first.")
     else:
-        st.success("Selections captured. (No write-back implemented)")
-        st.json({
-            "admin_pic": selected_pic,
-            "db": selected_db,
-            "activity": selected_activity,
-            "vessels": selected_vessels,
-            "picklists": selected_picklists,
-            "tujuan": tujuan,
-            "moda": moda,
-        })
+        # build payload
+        payload = {
+            "NOMOR MATRIX": st.session_state.matrix_number,
+            "MATRIX DATE": datetime.now().strftime("%Y-%m-%d"),  # formatted as date
+            "DATABASE": selected_db,
+            "Pick List No.": ";".join(selected_picklists),
+            "PIC": selected_pic,
+            "ACTIVITY": selected_activity,
+            "Vessel Name": "-".join(selected_vessels),
+            "Moda Pengiriman": moda
+        }
+        st.json(payload)
 
-# Debug / preview
-with st.expander("Preview loaded data (A:G if available)"):
-    preview_cols = [c for c in ["DB","Pick List","Timestamp","PIC","Urgency","Vessel","Concat"] if c in df.columns]
-    st.dataframe(df[preview_cols].head(200) if preview_cols else df.head(200))
+        # placeholder for sending to Apps Script
+        try:
+            # import requests here if not imported
+            # response = requests.post(WEBHOOK_URL, json=payload)
+            # st.success(f"Committed successfully: {response.status_code}")
+            st.info(f"Payload ready to send to Apps Script: {WEBHOOK_URL}")
+        except Exception as e:
+            st.error(f"Failed to send payload: {e}")
