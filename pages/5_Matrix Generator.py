@@ -14,10 +14,14 @@ SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
-# matrix numbering sheet (public) — PENOMORAN-MATRIX
+# matrix numbering sheet (public) — PENOMORAN-MATRIX (Sheet A)
 MATRIX_SHEET_ID = "1d9nYJEqus6B4f_W1OrRYYo3mZuYbh9lRkSM7-ywNsCk"
-MATRIX_SHEET_NAME = "PENOMORAN-MATRIX"
+MATRIX_SHEET_NAME = "PENOMORAN MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
+
+# matrix numbering sheet 2 (public) — PENOMORAN MATRIX STREAMLIT (Sheet B)
+MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
+MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
 # static lists
 ADMIN_PICS = [
@@ -172,51 +176,54 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
     return numeric_sorted + non_numeric
 
 # ----------------------
-# Matrix numbering (STRICTLY using COUNTIF PIC from PENOMORAN-MATRIX)
+# Matrix numbering (COUNT across multiple sheets)
 # ----------------------
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
-def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
+def next_matrix_number_countif_multi(df_list: list, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
     """
-    Generate next NOMOR MATRIX strictly by COUNTIF PIC from df_matrix (PENOMORAN-MATRIX).
-    - Counts rows where PIC (normalized) == selected pic (normalized), then next_seq = count + 1.
-    - Uses PIC_SHORTNAME mapping for short name in the generated string.
-    - If activity == "Delivery" -> token "DEL", else -> "OTHER".
-    - Format: MATRIX - 026-<TOKEN>-<PicShort>-<DB>-<ROMANMONTH>-<YEAR>
+    Count occurrences of PIC across multiple dataframes (list of df_matrix),
+    using the same strip-based matching currently implemented:
+      target = str(pic).strip()
+      series = df_matrix[pic_col].astype(object).fillna("").apply(lambda x: str(x).strip())
+      count = series.eq(target).sum()
+    Then sum counts across all provided DataFrames, +1 → next sequence.
     """
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
-    # detect PIC column name (case-insensitive)
-    pic_col = None
-    for c in df_matrix.columns:
-        if c.strip().lower() == "pic":
-            pic_col = c
-            break
+    target = str(pic).strip()
+    total_count = 0
 
-    if pic_col is None:
-        count_for_pic = 0
-    else:
+    for df_matrix in df_list:
+        if df_matrix is None or df_matrix.empty:
+            continue
+        # detect PIC column name (case-insensitive)
+        pic_col = None
+        for c in df_matrix.columns:
+            if c.strip().lower() == "pic":
+                pic_col = c
+                break
+        if pic_col is None:
+            continue
         try:
-            # strict trim-normalized comparison: strip both sides
-            target = str(pic).strip()
             series = df_matrix[pic_col].astype(object).fillna("").apply(lambda x: str(x).strip())
-            count_for_pic = int(series.eq(target).sum())
+            cnt = int(series.eq(target).sum())
+            total_count += cnt
         except Exception:
-            count_for_pic = 0
+            # ignore and continue
+            continue
 
-    next_seq = count_for_pic + 1
+    next_seq = total_count + 1
     seq_str = str(next_seq).zfill(seq_width)
 
-    # PIC short name for final string: look up mapping, fallback to cleaned uppercase-without-spaces if missing
     pic_short = PIC_SHORTNAME.get(pic, None)
     if not pic_short:
         pic_short = str(pic).strip().replace(" ", "")
-    # activity token: Delivery -> DEL else OTHER
-    token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
+    token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
     db_for_str = str(db).strip().upper()
 
     matrix_str = f"MATRIX - {seq_str}-{token}-{pic_short}-{db_for_str}-{month_rom}-{year}"
@@ -279,15 +286,16 @@ st.divider()
 st.write("Generate next NOMOR MATRIX for this PIC")
 if st.button("Generate Matrix Number"):
     try:
-        # --- FETCH FRESH MATRIX SHEET ON DEMAND ---
-        df_matrix = load_sheet_csv_fresh(MATRIX_CSV_URL)
+        # --- FETCH FRESH MATRIX SHEETS ON DEMAND (both sheets) ---
+        df_matrix_a = load_sheet_csv_fresh(MATRIX_CSV_URL)
+        df_matrix_b = load_sheet_csv_fresh(MATRIX2_CSV_URL)
 
         # use today's date (no user input)
         today_dt = datetime.now()
         use_date = datetime.combine(today_dt.date(), datetime.min.time())
 
-        matrix_number = next_matrix_number_countif(
-            df_matrix,
+        matrix_number = next_matrix_number_countif_multi(
+            [df_matrix_a, df_matrix_b],
             pic=selected_pic,
             db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
             activity=selected_activity,
