@@ -197,15 +197,24 @@ def next_matrix_number_countif_multi(df_list: list, pic: str, db: str, activity:
     target = str(pic).strip()
     total_count = 0
 
-   for df_matrix in df_list:
-    if df_matrix is None or df_matrix.empty:
-        continue
-    pic_col = next((c for c in df_matrix.columns if c.strip().lower() == "pic"), None)
-    if pic_col is None:
-        continue
-    series = df_matrix[pic_col].astype(str).fillna("").apply(lambda x: x.strip().lower())
-    cnt = int(series.eq(target).sum())
-    total_count += cnt
+ for df_matrix in df_list:
+        if df_matrix is None or df_matrix.empty:
+            continue
+        # detect PIC column name (case-insensitive)
+        pic_col = None
+        for c in df_matrix.columns:
+            if c.strip().lower() == "pic":
+                pic_col = c
+                break
+        if pic_col is None:
+            continue
+        try:
+            series = df_matrix[pic_col].astype(object).fillna("").apply(lambda x: str(x).strip())
+            cnt = int(series.eq(target).sum())
+            total_count += cnt
+        except Exception:
+            # ignore and continue
+            continue
 
     next_seq = total_count + 1
     seq_str = str(next_seq).zfill(seq_width)
