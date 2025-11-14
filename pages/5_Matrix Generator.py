@@ -183,8 +183,6 @@ tujuan = st.text_input("Tujuan")
 moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
 
 st.divider()
-st.write("Commit Nomor Matrix dan Rencana Pengiriman")
-
 # MATRIX GENERATOR
 if "matrix_number" not in st.session_state:
     st.session_state.matrix_number = None
@@ -217,6 +215,7 @@ if st.button("Generate Matrix Number"):
         st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
 
 # Commit / Send button
+st.write("Commit Nomor Matrix dan Rencana Pengiriman")
 if st.button("Commit"):
     if not st.session_state.matrix_number:
         st.error("Please generate a Matrix Number first.")
@@ -234,6 +233,7 @@ if st.button("Commit"):
             "Tujuan Pengiriman": tujuan
         }
         st.json(payload)
+        matrix_number = None
 
         # placeholder for sending to Apps Script
         try:
