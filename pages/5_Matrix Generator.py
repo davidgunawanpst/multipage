@@ -180,32 +180,36 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
 # ----------------------
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
-def next_matrix_number_countif_multi(df_list: list, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
+def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity, use_date=None, seq_width=3):
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
-    total_count = 0
+    # --- count in Sheet A ---
+    pic_col_a = next((c for c in df_matrix_a.columns if c.strip().lower() == "pic"), None)
+    count_a = 0
+    if pic_col_a:
+        count_a = df_matrix_a[pic_col_a].astype(str).str.strip().eq(pic).sum()
 
-    for df_matrix in df_list:
-        if df_matrix is None or df_matrix.empty:
-            continue
-        pic_col = next((c for c in df_matrix.columns if c.strip().lower() == "pic"), None)
-        if pic_col is None:
-            continue
-        try:
-            # strip both sides to ensure exact visible match
-            total_count += int(df_matrix[pic_col].astype(str).str.strip().eq(pic.strip()).sum())
-        except Exception:
-            continue
+    # --- count in Sheet B ---
+    pic_col_b = next((c for c in df_matrix_b.columns if c.strip().lower() == "pic"), None)
+    count_b = 0
+    if pic_col_b:
+        count_b = df_matrix_b[pic_col_b].astype(str).str.strip().eq(pic).sum()
 
-    next_seq = total_count + 1
+    # --- total ---
+    next_seq = int(count_a + count_b + 1)
     seq_str = str(next_seq).zfill(seq_width)
-    pic_short = PIC_SHORTNAME.get(pic, str(pic).replace(" ", ""))
+
+    # short PIC
+    pic_short = PIC_SHORTNAME.get(pic, pic.replace(" ", ""))
+
+    # token
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
-    db_for_str = str(db).strip().upper()
-    matrix_str = f"MATRIX - {seq_str}-{token}-{pic_short}-{db_for_str}-{month_rom}-{year}"
+
+    # build number
+    matrix_str = f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
     return matrix_str
 
 
