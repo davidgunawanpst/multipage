@@ -227,7 +227,7 @@ if st.button("Commit"):
             "DATABASE": selected_db,
             "Pick List No.": ";".join(selected_picklists),
             "PIC": selected_pic,
-            "ACTIVITY": selected_activity,
+            "ACTIVITY": selected_activity.upper(),
             "Vessel Name": "-".join(selected_vessels),
             "Moda Pengiriman": moda,
             "Tujuan Pengiriman": tujuan
