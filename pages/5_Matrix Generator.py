@@ -1,23 +1,39 @@
+"""
+Streamlit app — Pick lists + Matrix number generator (no auth; public sheets)
+
+What it does:
+- Loads "List Finish Packing" (sheet J:O but reads entire CSV) from a public Google Sheet.
+- Loads "PENOMORAN-MATRIX" (matrix numbering table) from a second public Google Sheet.
+- Lets user pick Admin PIC, DB, one-or-more Vessels, then shows Pick Lists (multi-select) derived from selected vessels.
+  - Pick lists are collected from "Pick List" column, with fallback to "Concat" column (A:G) and "Pick List NO." if present.
+  - Numeric pick lists like 3008.0 are cleaned to "3008". String picks (e.g. DMI-Manual-1) are preserved.
+- Inputs Tujuan and Moda Pengiriman.
+- Generates the next NOMOR MATRIX for the chosen PIC (based on rows in the PENOMORAN-MATRIX sheet).
+- No write-back implemented (placeholder button present).
+
+Drop this file into your Streamlit app and run: `streamlit run app.py`
+"""
+
 import streamlit as st
 import requests
 import pandas as pd
+import re
 from io import StringIO
 from urllib.parse import quote_plus
-
-# Optional auth import — if you don't have it, comment out the two lines that use check_password.
-try:
-    from auth import check_password
-    USE_AUTH = True
-except Exception:
-    USE_AUTH = False
-    check_password = lambda: True  # dummy
+from datetime import datetime
 
 # ----------------------
-# Configuration
+# Configuration (public sheets)
 # ----------------------
+# main sheet (List Finish Packing)
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
+
+# matrix numbering sheet (public)
+MATRIX_SHEET_ID = "1d9nYJEqus6B4f_W1OrRYYo3mZuYbh9lRkSM7-ywNsCk"
+MATRIX_SHEET_NAME = "PENOMORAN-MATRIX"
+MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
 ADMIN_PICS = [
     "Abim Priambada",
@@ -28,36 +44,23 @@ ADMIN_PICS = [
 
 DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 
-MODA_OPTIONS = [
-    "Sea Freight",
-    "Air Freight",
-    "Land Freight",
-    "Handcarry",
-]
+MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
 
-# Expected columns we care about (A:G area); 'Concat' is present in your sheet screenshots
 EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
 
 # ----------------------
-# Helpers
+# Utilities
 # ----------------------
 @st.cache_data(ttl=300)
 def load_sheet_csv(url: str) -> pd.DataFrame:
-    """Fetch published CSV and return DataFrame (all columns)."""
+    """Load a public Google Sheet CSV into a pandas DataFrame."""
     resp = requests.get(url, timeout=20)
     resp.raise_for_status()
     df = pd.read_csv(StringIO(resp.text), dtype=object)
     return df
 
-
-def clean_candidate_value(val):
-    """
-    Normalize a candidate pick-list value:
-     - If numeric float or string representing integer (e.g. '3008.0') -> '3008'
-     - If integer -> '123'
-     - If alphanumeric -> keep trimmed string (e.g. 'DMI-Manual-1')
-     - Return None for empty-like values
-    """
+def _clean_candidate_value(val):
+    """Normalize candidate value: clean floats like 3008.0 -> '3008', preserve strings."""
     if pd.isna(val):
         return None
     if isinstance(val, int):
@@ -72,7 +75,7 @@ def clean_candidate_value(val):
     s = str(val).strip()
     if s == "" or s.lower() in {"nan", "none"}:
         return None
-    # try parse string number like '3008.0'
+    # try parse string numeric like "3008.0"
     try:
         fv = float(s)
         if fv.is_integer():
@@ -84,12 +87,8 @@ def clean_candidate_value(val):
     except Exception:
         return s
 
-
-def extract_from_concat(concat_val):
-    """
-    Concat appears as 'DB|Pick' like 'DMI|3015' or 'PKS|PKS-Manual-1'.
-    Return the last segment after '|' cleaned, or None.
-    """
+def _extract_from_concat(concat_val):
+    """Concat format like 'DMI|3015' or 'DMI|DMI-Manual-1' => return last cleaned part."""
     if pd.isna(concat_val):
         return None
     s = str(concat_val).strip()
@@ -98,12 +97,10 @@ def extract_from_concat(concat_val):
     parts = [p.strip() for p in s.split("|") if p and p.strip() != ""]
     if not parts:
         return None
-    # take last part and clean it
-    return clean_candidate_value(parts[-1])
-
+    return _clean_candidate_value(parts[-1])
 
 def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
-    """Return sorted unique Vessel values for a DB (trimmed strings)."""
+    """Return sorted unique Vessel values for a DB."""
     if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
     subset = df[df["DB"].astype(str).str.strip() == selected_db]
@@ -111,35 +108,23 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     vessels = [v for v in vessels if v != ""]
     return sorted(vessels)
 
-
 def get_picklists_for_vessel_using_concat(df: pd.DataFrame, selected_db: str, selected_vessel: str) -> list:
-    """
-    Build pick list options for a selected DB+Vessel using:
-      1) 'Pick List' column (cleaned)
-      2) fallback to 'Concat' column (extract last segment after '|')
-      3) fallback to 'Pick List NO.' if present
-    Preserves order & uniqueness; numeric-only picks are sorted numerically first,
-    then non-numeric picks kept in their first-seen order.
-    """
+    """Collect picklist IDs for rows matching DB+Vessel using Pick List, Concat, or Pick List NO."""
     if not {"DB", "Vessel"}.issubset(df.columns):
         return []
-
     cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip() == selected_vessel)
     rows = df.loc[cond, :]
-
     picks_raw = []
     for _, r in rows.iterrows():
         candidate = None
         if "Pick List" in r.index:
-            candidate = clean_candidate_value(r.get("Pick List", None))
+            candidate = _clean_candidate_value(r.get("Pick List", None))
         if (candidate is None or str(candidate).strip() == "") and "Concat" in r.index:
-            candidate = extract_from_concat(r.get("Concat", None))
+            candidate = _extract_from_concat(r.get("Concat", None))
         if (candidate is None or str(candidate).strip() == "") and "Pick List NO." in r.index:
-            candidate = clean_candidate_value(r.get("Pick List NO.", None))
-
+            candidate = _clean_candidate_value(r.get("Pick List NO.", None))
         if candidate and str(candidate).strip() != "":
             picks_raw.append(str(candidate).strip())
-
     # preserve order & uniqueness
     seen = set()
     final_ordered = []
@@ -147,112 +132,136 @@ def get_picklists_for_vessel_using_concat(df: pd.DataFrame, selected_db: str, se
         if p not in seen:
             seen.add(p)
             final_ordered.append(p)
-
+    # numeric-first sort (numerics ascending), then non-numeric in original order
     numeric = [x for x in final_ordered if x.isdigit()]
     non_numeric = [x for x in final_ordered if not x.isdigit()]
     numeric_sorted = sorted(numeric, key=lambda s: int(s))
     return numeric_sorted + non_numeric
 
-
 def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected_vessels: list) -> list:
-    """
-    Given a list of selected vessels, collect picklist options from each vessel (in the order of the vessel list),
-    preserve first-seen order, then produce numeric-first sorted output.
-    """
+    """Aggregate picklists across multiple vessels preserving first-seen order then numeric-first sort."""
     if not selected_vessels:
         return []
     picks_seen = []
     for vessel in selected_vessels:
-        picks = get_picklists_for_vessel_using_concat(df, selected_db, vessel)
-        for p in picks:
-            picks_seen.append(p)  # we dedupe later preserving first-seen
-    # dedupe preserving order
-    seen = set()
-    ordered = []
+        for p in get_picklists_for_vessel_using_concat(df, selected_db, vessel):
+            picks_seen.append(p)
+    seen = set(); ordered = []
     for p in picks_seen:
         if p not in seen:
-            seen.add(p)
-            ordered.append(p)
-    # final numeric-first order: numeric sorted, then non-numeric in their preserved order
+            seen.add(p); ordered.append(p)
     numeric = [x for x in ordered if x.isdigit()]
     non_numeric = [x for x in ordered if not x.isdigit()]
     numeric_sorted = sorted(numeric, key=lambda s: int(s))
     return numeric_sorted + non_numeric
 
+# ----------------------
+# Matrix number helpers (use matrix sheet DF)
+# ----------------------
+_ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
+
+def _find_nomor_matrix_column(df: pd.DataFrame) -> str | None:
+    cols_lower = {c.lower(): c for c in df.columns}
+    if "nomor matrix" in cols_lower:
+        return cols_lower["nomor matrix"]
+    # fallback any col containing both words
+    for c in df.columns:
+        low = c.lower()
+        if "nomor" in low and "matrix" in low:
+            return c
+    return None
+
+def _extract_seq_from_nomor_matrix(nomor_str: str) -> int | None:
+    if not nomor_str or not isinstance(nomor_str, str):
+        return None
+    m = re.search(r"matrix\s*[-]\s*(\d+)\s*[-]\s*del", nomor_str, flags=re.I)
+    if not m:
+        m = re.search(r"matrix\s*[-]\s*(\d+)", nomor_str, flags=re.I)
+    if m:
+        try:
+            return int(m.group(1))
+        except Exception:
+            return None
+    return None
+
+def next_matrix_number_from_df(df_matrix: pd.DataFrame, pic: str, db: str, use_date: datetime | None = None, seq_width: int = 3) -> str:
+    """Compute next NOMOR MATRIX based on existing matrix table (df_matrix)."""
+    if use_date is None:
+        use_date = datetime.now()
+    month_rom = _ROMAN.get(use_date.month, str(use_date.month))
+    year = use_date.year
+    pic_norm_for_str = str(pic).strip().upper().replace(" ", "")
+    db_norm = str(db).strip().upper()
+
+    # find columns
+    cols_lower = {c.lower(): c for c in df_matrix.columns}
+    pic_col = cols_lower.get("pic", None)
+    nm_col = _find_nomor_matrix_column(df_matrix)
+
+    seqs = []
+    if nm_col and pic_col:
+        mask = df_matrix[pic_col].astype(str).str.strip().str.upper() == str(pic).strip().upper()
+        for val in df_matrix.loc[mask, nm_col].astype(object).tolist():
+            seq = _extract_seq_from_nomor_matrix(val)
+            if seq is not None:
+                seqs.append(seq)
+    elif pic_col:
+        count_for_pic = int(df_matrix[pic_col].astype(str).str.strip().str.upper().eq(str(pic).strip().upper()).sum())
+        seqs.append(count_for_pic)
+
+    max_seq = max(seqs) if seqs else 0
+    next_seq = max_seq + 1
+    seq_str = str(next_seq).zfill(seq_width)
+    matrix_str = f"MATRIX - {seq_str}-DEL-{pic_norm_for_str}-{db_norm}-{month_rom}-{year}"
+    return matrix_str
 
 # ----------------------
 # App UI
 # ----------------------
-st.set_page_config(page_title="Matrix Generator", layout="wide")
-st.title("Matrix Generator")
+st.set_page_config(page_title="Matrix Generator (Pick Lists)", layout="wide")
+st.title("Matrix Generator — Pick Lists & Numbering")
 
-# auth (optional)
-if USE_AUTH:
-    ok = check_password()
-else:
-    ok = True
-
-if not ok:
-    st.stop()
-
-# MAIN PAGE: place PIC on main page (not sidebar)
-selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
-
-# Load sheet CSV
-with st.spinner("Loading sheet..."):
+# Load both sheets
+with st.spinner("Loading sheets..."):
     try:
-        df_all = load_sheet_csv(CSV_URL)
+        df_main = load_sheet_csv(CSV_URL)
     except Exception as e:
-        st.error(f"Failed to load sheet CSV: {e}")
+        st.error(f"Failed to load main sheet: {e}")
+        st.stop()
+    try:
+        df_matrix = load_sheet_csv(MATRIX_CSV_URL)
+    except Exception as e:
+        st.error(f"Failed to load matrix sheet: {e}")
         st.stop()
 
-# Map expected columns case-insensitively
+# Map expected columns case-insensitively in main df
 cols_map = {}
-for c in df_all.columns:
+for c in df_main.columns:
     for exp in EXPECTED_COLS:
         if c.strip().lower() == exp.lower():
             cols_map[exp] = c
+df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-missing = [e for e in EXPECTED_COLS if e not in cols_map]
-if missing:
-    st.info(f"Note: some expected columns not found: {missing}. Available cols: {list(df_all.columns)}")
-
-# rename to canonical names where possible
-df = df_all.rename(columns={v: k for k, v in cols_map.items()})
-
-# Ensure referenced columns exist and are object-typed
-for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
+# ensure object dtype for referenced cols
+for col in ["DB","Pick List","Vessel","Concat","PIC","Timestamp","Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
-# DB select
+# MAIN INPUTS (PIC on main page)
+selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 
-# Vessel multiselect depends on DB (allow user to pick multiple vessels)
+# Vessel multi-select (based on DB)
 vessel_options = []
 if selected_db and selected_db != "-- Select DB --":
     vessel_options = get_vessels_for_db(df, selected_db)
 selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_options)
 
-# Build aggregated picklist options from all selected vessels
+# Aggregate picklist options across selected vessels
 picklist_options = []
 if selected_db and selected_db != "-- Select DB --" and selected_vessels:
     picklist_options = aggregate_picklists_for_vessels(df, selected_db, selected_vessels)
 
-# Debug: show raw A:G rows for selected DB+Vessels
-with st.expander("🔎 Debug: raw A:G rows for selected DB+Vessel(s)"):
-    if selected_db and selected_db != "-- Select DB --" and selected_vessels:
-        cond = (df["DB"].astype(str).str.strip() == selected_db) & (df["Vessel"].astype(str).str.strip().isin(selected_vessels))
-        debug_rows = df.loc[cond, :]
-        cols_a_to_g = [c for c in ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"] if c in debug_rows.columns]
-        if cols_a_to_g:
-            st.dataframe(debug_rows[cols_a_to_g].head(200))
-        else:
-            st.dataframe(debug_rows.head(200))
-    else:
-        st.write("Select DB and at least one Vessel to preview these rows.")
-
-# Multi-select pick lists (options derived from selected vessels)
 selected_picklists = st.multiselect("Pick List (choose one or more)", options=picklist_options)
 
 # Tujuan and Moda Pengiriman
@@ -270,7 +279,20 @@ st.write({
     "Moda Pengiriman": moda,
 })
 
-# Placeholder action button (no write-back)
+# Matrix generator UI (uses df_matrix)
+st.markdown("### Matrix number")
+with st.expander("Generate next NOMOR MATRIX for this PIC (from PENOMORAN-MATRIX sheet)"):
+    chosen_date = st.date_input("Matrix Date (used to build month/year)", value=datetime.now().date())
+    seq_width = st.number_input("Sequence zero-pad width", min_value=1, max_value=6, value=3, step=1)
+    if st.button("Generate Matrix Number"):
+        try:
+            matrix_number = next_matrix_number_from_df(df_matrix, pic=selected_pic, db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN", use_date=datetime.combine(chosen_date, datetime.min.time()), seq_width=seq_width)
+            st.success("Generated: " + matrix_number)
+            st.code(matrix_number)
+        except Exception as e:
+            st.error(f"Failed to generate matrix number: {e}")
+
+# Placeholder Submit / Save
 if st.button("Proceed / Save (placeholder)"):
     errors = []
     if selected_db in ("", "-- Select DB --"):
@@ -283,7 +305,6 @@ if st.button("Proceed / Save (placeholder)"):
         errors.append("Please enter Tujuan.")
     if moda in ("", "-- Select Moda --"):
         errors.append("Please select Moda Pengiriman.")
-
     if errors:
         st.error("Validation failed:\n- " + "\n- ".join(errors))
     else:
@@ -297,10 +318,10 @@ if st.button("Proceed / Save (placeholder)"):
             "moda": moda,
         })
 
-# Preview relevant columns
+# Debug / preview
 with st.expander("Preview loaded data (A:G if available)"):
-    preview_cols = [c for c in ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"] if c in df.columns]
+    preview_cols = [c for c in ["DB","Pick List","Timestamp","PIC","Urgency","Vessel","Concat"] if c in df.columns]
     if preview_cols:
         st.dataframe(df[preview_cols].head(200))
     else:
-        st.write("No A:G columns found to preview.")
+        st.dataframe(df.head(200))
