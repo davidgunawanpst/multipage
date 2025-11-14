@@ -35,10 +35,10 @@ ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 
 # mapping for PIC -> short name used in matrix
 PIC_SHORTNAME = {
-    "Abim Priambada": "Abim",
-    "Maftuh Ikhsan": "Maftuh",
-    "Rifka Fahrul Musthofa": "Fahrul",
-    "Rudi Haryanto": "Rudi",
+    "Abim Priambada": "ABIM",
+    "Maftuh Ikhsan": "MAFTUH",
+    "Rifka Fahrul Musthofa": "FAHRUL",
+    "Rudi Haryanto": "RUDI",
 }
 
 # expected columns to map (case-insensitive)
@@ -168,7 +168,7 @@ def _normalize_pic_for_count(raw_pic) -> str:
         return ""
     s = str(raw_pic).strip()
     s = " ".join(s.split())
-    return s.upper()
+    return s
 
 def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
     """
