@@ -230,7 +230,7 @@ if st.button("Commit"):
             "PIC": selected_pic,
             "ACTIVITY": selected_activity,
             "Vessel Name": "-".join(selected_vessels),
-            "Moda Pengiriman": moda
+            "Moda Pengiriman": moda,
             "Tujuan Pengiriman": tujuan
         }
         st.json(payload)
