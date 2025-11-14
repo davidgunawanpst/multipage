@@ -30,6 +30,17 @@ DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
 
+# activity options requested
+ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
+
+# mapping for PIC -> short name used in matrix
+PIC_SHORTNAME = {
+    "Abim Priambada": "Abim",
+    "Maftuh Ikhsan": "Maftuh",
+    "Rifka Fahrul Musthofa": "Fahrul",
+    "Rudi Haryanto": "Rudi",
+}
+
 # expected columns to map (case-insensitive)
 EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
 
@@ -152,35 +163,35 @@ def aggregate_picklists_for_vessels(df: pd.DataFrame, selected_db: str, selected
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
 def _normalize_pic_for_count(raw_pic) -> str:
-    """Normalize PIC string for counting: trim, collapse spaces."""
+    """Normalize PIC string for counting: trim, collapse spaces, uppercase for robust matching."""
     if pd.isna(raw_pic):
         return ""
     s = str(raw_pic).strip()
-    # collapse multiple spaces
     s = " ".join(s.split())
-    return s
+    return s.upper()
 
-def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
+def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, activity: str, use_date: datetime | None = None, seq_width: int = SEQ_WIDTH) -> str:
     """
     Generate next NOMOR MATRIX strictly by COUNTIF PIC from df_matrix (PENOMORAN-MATRIX).
     - Counts rows where PIC (normalized) == selected pic (normalized), then next_seq = count + 1.
-    - Format: MATRIX - 026-DEL-PICDB-<DB>-<ROMANMONTH>-<YEAR>
-      PIC in this formatted string will be uppercase, spaces removed (per your example).
+    - Uses PIC_SHORTNAME mapping for short name in the generated string.
+    - If activity == "Delivery" -> token "DEL", else -> "OTHER".
+    - Format: MATRIX - 026-<TOKEN>-<PicShort>-<DB>-<ROMANMONTH>-<YEAR>
     """
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
-    # normalize pic for comparison
+    # normalize pic for comparison (case-insensitive, collapsed spaces)
     target_pic_norm = _normalize_pic_for_count(pic)
 
-    # try to detect PIC column name (case-insensitive)
+    # detect PIC column name (case-insensitive)
     cols_lower = {c.lower(): c for c in df_matrix.columns}
     pic_col = None
-    for cand in ["pic", "PIC", "Pic"]:
-        if cand.lower() in cols_lower:
-            pic_col = cols_lower[cand.lower()]
+    for cand in ["pic"]:
+        if cand in cols_lower:
+            pic_col = cols_lower[cand]
             break
     if pic_col is None:
         # fallback: any column named 'pic' ignoring case/spacing
@@ -203,12 +214,19 @@ def next_matrix_number_countif(df_matrix: pd.DataFrame, pic: str, db: str, use_d
     next_seq = count_for_pic + 1
     seq_str = str(next_seq).zfill(seq_width)
 
-    # PIC in final string: uppercase and remove spaces (as your example shows)
-    pic_for_str = str(pic).strip().upper().replace(" ", "")
+    # PIC short name for final string: look up mapping, fallback to cleaned uppercase-without-spaces if missing
+    pic_short = PIC_SHORTNAME.get(pic, None)
+    if not pic_short:
+        # fallback: remove spaces and capitalize first letter
+        pic_short = str(pic).strip()
+        pic_short = " ".join(pic_short.split())
+        pic_short = pic_short.replace(" ", "")
+    # activity token: Delivery -> DEL else OTHER
+    token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
     db_for_str = str(db).strip().upper()
 
-    matrix_str = f"MATRIX - {seq_str}-DEL-{pic_for_str}-{db_for_str}-{month_rom}-{year}"
+    matrix_str = f"MATRIX - {seq_str}-{token}-{pic_short}-{db_for_str}-{month_rom}-{year}"
     return matrix_str
 
 # ----------------------
@@ -246,6 +264,7 @@ for col in ["DB","Pick List","Vessel","Concat","PIC","Timestamp","Urgency"]:
 # Main inputs
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
+selected_activity = st.selectbox("Activity", ACTIVITY_OPTIONS)
 
 # Vessel multiselect (based on DB)
 vessel_options = []
@@ -269,6 +288,7 @@ st.subheader("Selection Summary")
 st.write({
     "Admin PIC": selected_pic,
     "DB": selected_db,
+    "Activity": selected_activity,
     "Vessel(s)": selected_vessels,
     "Pick List(s)": selected_picklists,
     "Tujuan": tujuan,
@@ -286,6 +306,7 @@ with st.expander("Generate next NOMOR MATRIX for this PIC (COUNTIF PIC from PENO
                 df_matrix,
                 pic=selected_pic,
                 db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
+                activity=selected_activity,
                 use_date=datetime.combine(chosen_date, datetime.min.time()),
                 seq_width=SEQ_WIDTH,
             )
@@ -314,6 +335,7 @@ if st.button("Proceed / Save (placeholder)"):
         st.json({
             "admin_pic": selected_pic,
             "db": selected_db,
+            "activity": selected_activity,
             "vessels": selected_vessels,
             "picklists": selected_picklists,
             "tujuan": tujuan,
