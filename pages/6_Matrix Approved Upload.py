@@ -60,9 +60,7 @@ def get_unique_ordered_vals(seq):
 
 # ---------------- App ----------------
 if check_password():
-    st.title("📥 PENOMORAN MATRIX — Upload PDF & record Nomor Matrix + DB")
-    st.caption("Pick DB first — Nomor Matrix will be filtered where STATUS is empty and DB matches the selected DB.")
-
+    st.title("Upload Matrix Approval")
     # Load sheet
     try:
         with st.spinner("Loading sheet..."):
@@ -94,11 +92,9 @@ if check_password():
         st.warning("No DB values found in sheet. Make sure the 'DB' column exists and has values.")
 
     # --- Selection UI: DB first ---
-    st.subheader("1) Select DB (pick first)")
-    selected_db = st.selectbox("Database (DB):", options=[""] + db_vals, index=0)
+   selected_db = st.selectbox("Database (DB):", options=[""] + db_vals, index=0)
 
     # --- Populate Nomor Matrix options based on DB & STATUS empty ---
-    st.subheader("2) Select Nomor Matrix (filtered by DB and STATUS empty)")
     nomor_options = []
     if selected_db:
         # filter by DB equals selected_db and status empty
@@ -131,7 +127,6 @@ if check_password():
     st.markdown("---")
 
     # --- File upload (single PDF, fixed 15 MB) ---
-    st.subheader(f"3) Upload PDF (single file — max {MAX_MB} MB)")
     uploaded = st.file_uploader("Choose a PDF file", type=["pdf"], accept_multiple_files=False)
     valid_bytes = None
     if uploaded is not None:
@@ -159,7 +154,6 @@ if check_password():
     st.markdown("---")
 
     # --- Submit ---
-    st.subheader("4) Submit — sends data to hardcoded Apps Script")
     if st.button("✅ Submit"):
         # validations
         if APP_SCRIPT_ID == "REPLACE_WITH_YOUR_APP_SCRIPT_ID":
