@@ -140,15 +140,15 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    required = {"Database", "Pick List NO.", "Start Packing", "Finish Packing"}
+    required = {"Database", "Pick List NO.", "Actual Start Packing", "Actual Finish Packing"}
     if not required.issubset(set(df.columns)):
         missing = required - set(df.columns)
         raise ValueError(f"Sheet missing required columns: {missing}")
 
     df["Database"] = df["Database"].astype(str).str.strip()
 
-    start_raw = df["Start Packing"]
-    finish_raw = df["Finish Packing"]
+    start_raw = df["Actual Start Packing"]
+    finish_raw = df["Actual Finish Packing"]
 
     start_has_value = ~(start_raw.isna() | (start_raw.astype(str).str.strip().str.lower().isin(['', 'nan', 'none'])))
     finish_empty = (finish_raw.isna() | (finish_raw.astype(str).str.strip().str.lower().isin(['', 'nan', 'none'])))
@@ -182,8 +182,8 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
 
 # === Streamlit UI ===
 if check_password():
-    st.set_page_config(page_title="Finish Packing", layout="wide")
-    st.title("📦 Finish Packing")
+    st.set_page_config(page_title="Actual Finish Packing", layout="wide")
+    st.title("📦 Actual Finish Packing")
 
     selected_pic = st.selectbox("PIC :", pic_list)
     db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
@@ -200,7 +200,7 @@ if check_password():
         available_picks = []
 
     if not available_picks:
-        st.warning("No available Pick Lists where Start Packing exists and Finish Packing is empty.")
+        st.warning("No available Pick Lists where Actual Start Packing exists and Actual Finish Packing is empty.")
         pick_numbers = st.multiselect("Pick List Number(s):", [])
     else:
         pick_numbers = st.multiselect("Pick List Number(s):", available_picks)
