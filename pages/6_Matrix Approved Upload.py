@@ -153,7 +153,6 @@ if check_password():
     st.markdown("---")
 
     # --- Submit ---
-    st.subheader("4) Submit — sends data to hardcoded Apps Script")
     if st.button("✅ Submit"):
         # validations
         if APP_SCRIPT_ID == "REPLACE_WITH_YOUR_APP_SCRIPT_ID":
