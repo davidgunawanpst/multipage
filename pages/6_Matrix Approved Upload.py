@@ -94,7 +94,6 @@ if check_password():
         st.warning("No DB values found in sheet. Make sure the 'DB' column exists and has values.")
 
     # --- Selection UI: DB first ---
-    st.subheader("1) Select DB (pick first)")
     selected_db = st.selectbox("Database (DB):", options=[""] + db_vals, index=0)
 
     # --- Populate Nomor Matrix options based on DB & STATUS empty ---
