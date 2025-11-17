@@ -60,13 +60,13 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list[str]:
     df = df.copy()
     df.columns = df.columns.str.strip()
 
-    required = {"Database", "Pick List NO.", "Start Packing"}
+    required = {"Database", "Pick List NO.", "Actual Start Packing"}
     if not required.issubset(df.columns):
         raise ValueError(f"Sheet missing required columns: {', '.join(required)}")
 
     df["Database"] = df["Database"].astype(str).str.strip()
 
-    start_as_str = df["Start Packing"].fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
+    start_as_str = df["Actual Start Packing"].fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
     df["_StartPackingClean"] = start_as_str
 
     filtered = df[(df["Database"] == selected_db) & (df["_StartPackingClean"] == "")].copy()
