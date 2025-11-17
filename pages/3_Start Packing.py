@@ -141,7 +141,7 @@ if check_password():
             st.dataframe(db_rows.head(200))
 
             st.subheader("Rows where Start Packing considered BLANK (should be included)")
-            start_raw = df["Start Packing"]
+            start_raw = df["Actual Start Packing"]
             start_as_str = start_raw.fillna("").astype(str).str.strip().replace({"nan": "", "None": "", "NaN": ""})
             df["_StartPackingClean"] = start_as_str
             matched = df[(df["Database"].astype(str).str.strip() == selected_db) & (df["_StartPackingClean"] == "")]
