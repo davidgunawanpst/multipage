@@ -60,8 +60,7 @@ def get_unique_ordered_vals(seq):
 
 # ---------------- App ----------------
 if check_password():
-    st.title("📥 PENOMORAN MATRIX — Upload PDF & record Nomor Matrix + DB")
-    st.caption("Pick DB first — Nomor Matrix will be filtered where STATUS is empty and DB matches the selected DB.")
+    st.title("Upload Matrix Approved")
 
     # Load sheet
     try:
