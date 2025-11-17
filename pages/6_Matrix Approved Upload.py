@@ -96,7 +96,6 @@ if check_password():
     selected_db = st.selectbox("Database (DB):", options=[""] + db_vals, index=0)
 
     # --- Populate Nomor Matrix options based on DB & STATUS empty ---
-    st.subheader("2) Select Nomor Matrix (filtered by DB and STATUS empty)")
     nomor_options = []
     if selected_db:
         # filter by DB equals selected_db and status empty
