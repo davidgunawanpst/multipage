@@ -101,17 +101,17 @@ def extract_from_unique_code(unique_code_value):
     return s or None
 
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
-    # expects columns: Database, Pick List NO., Finish Packing, Nomor Matrix (case-sensitive names from sheet)
+    # expects columns: Database, Pick List NO., Actual Finish Packing, Nomor Matrix (case-sensitive names from sheet)
     df = df.copy()
     df.columns = df.columns.str.strip()
     # ensure required columns exist
-    required = {"Database", "Pick List NO.", "Finish Packing", "Nomor Matrix"}
+    required = {"Database", "Pick List NO.", "Actual Finish Packing", "Nomor Matrix"}
     if not required.issubset(set(df.columns)):
         missing = required - set(df.columns)
         raise ValueError(f"Sheet missing required columns: {missing}")
 
     df["Database"] = df["Database"].astype(str).str.strip()
-    finish_nonempty = ~(df["Finish Packing"].isna() | df["Finish Packing"].astype(str).str.strip().str.lower().isin(['', 'nan', 'none']))
+    finish_nonempty = ~(df["Actual Finish Packing"].isna() | df["Actual Finish Packing"].astype(str).str.strip().str.lower().isin(['', 'nan', 'none']))
     nomor_nonempty = ~(df["Nomor Matrix"].isna() | df["Nomor Matrix"].astype(str).str.strip().str.lower().isin(['', 'nan', 'none']))
 
     filtered = df[(df["Database"] == selected_db) & finish_nonempty & nomor_nonempty].copy()
@@ -144,8 +144,8 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
 # UI
 # -----------------------
 if check_password():
-    st.set_page_config(page_title="Upload Photos (Finish Packing)", layout="wide")
-    st.title("📸 Upload Photos — Finish Packing")
+    st.set_page_config(page_title="Upload Photos (Actual Finish Packing)", layout="wide")
+    st.title("📸 Upload Photos — Actual Finish Packing")
 
     # 1) DB select
     selected_db = st.selectbox("Database (DB):", DB_LIST)
@@ -161,7 +161,7 @@ if check_password():
             available_picks = []
 
     if not available_picks:
-        st.warning("No available Pick Lists where Finish Packing is not empty and Nomor Matrix is not empty.")
+        st.warning("No available Pick Lists where Actual Finish Packing is not empty and Nomor Matrix is not empty.")
         pick_numbers = st.multiselect("Pick List Number(s):", [])
     else:
         pick_numbers = st.multiselect("Pick List Number(s):", available_picks)
