@@ -108,9 +108,7 @@ if check_password():
             filtered = df[final_mask].copy()
             nomor_options = get_unique_ordered_vals(filtered["Nomor Matrix"])
             st.write(f"Nomor Matrix options found: {len(nomor_options)}")
-    else:
-        st.info("Choose a DB first — Nomor Matrix options will appear after selecting DB.")
-
+    
     selected_nomor = None
     if not nomor_options:
         st.selectbox("Nomor Matrix:", options=["— none available —"], index=0)
