@@ -240,29 +240,33 @@ else:
     matrix_generated = st.session_state.matrix_number
 
 if st.button("Generate Matrix Number"):
-    try:
-        # --- FETCH FRESH MATRIX SHEETS ON DEMAND (both sheets) ---
-        df_matrix_a = load_sheet_csv_fresh(MATRIX_CSV_URL)
-        df_matrix_b = load_sheet_csv_fresh(MATRIX2_CSV_URL)
+    # → Handcarry shortcut
+    if moda == "Handcarry":
+        st.session_state.matrix_number = "Handcarry"
+        st.success("Generated: Handcarry")
+        st.code("Handcarry")
+    else:
+        try:
+            # --- FETCH FRESH MATRIX SHEETS ON DEMAND ---
+            df_matrix_a = load_sheet_csv_fresh(MATRIX_CSV_URL)
+            df_matrix_b = load_sheet_csv_fresh(MATRIX2_CSV_URL)
 
-        # use today's date (no user input)
-        today_dt = datetime.now()
-        use_date = datetime.combine(today_dt.date(), datetime.min.time())
+            today_dt = datetime.now()
+            use_date = datetime.combine(today_dt.date(), datetime.min.time())
 
-        matrix_number = next_matrix_number_countif_multi(
-            df_matrix_a, df_matrix_b,
-            pic=selected_pic,
-            db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
-            activity=selected_activity,
-            use_date=use_date,
-            seq_width=SEQ_WIDTH,
-        )
-        st.session_state.matrix_number = matrix_number
-        st.success("Generated: " + matrix_number)
-        st.code(matrix_number)
-    except Exception as e:
-        st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
-
+            matrix_number = next_matrix_number_countif_multi(
+                df_matrix_a, df_matrix_b,
+                pic=selected_pic,
+                db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
+                activity=selected_activity,
+                use_date=use_date,
+                seq_width=SEQ_WIDTH,
+            )
+            st.session_state.matrix_number = matrix_number
+            st.success("Generated: " + matrix_number)
+            st.code(matrix_number)
+        except Exception as e:
+            st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
 # Commit / Send button
 st.write("Commit Nomor Matrix dan Rencana Pengiriman")
 if st.button("Commit"):
