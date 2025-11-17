@@ -28,7 +28,7 @@ MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
 # webhook URL
-WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbxcZvcatghMy02glb90d3affYbXnexeZj393DNfz86TtmR0KK3me34EWVBC8_wMN1--JA/exec"
+WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
 # static lists
 ADMIN_PICS = [
