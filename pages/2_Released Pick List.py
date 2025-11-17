@@ -73,8 +73,8 @@ if check_password():
 
     # --- Load Vessel Data ---
     df_vessel = load_csv(VESSEL_CSV_URL)
-    vessels_for_db = df_vessel[df_vessel["DB"].astype(str).str.strip() == selected_db]
-    vessel_options = sorted(vessels_for_db["Vessel Name"].dropna().astype(str).unique().tolist())
+    vessels_for_db = df_vessel[df_vessel["DB"].astype(str).str.strip() == selected_db] if not df_vessel.empty else pd.DataFrame()
+    vessel_options = sorted(vessels_for_db["Vessel Name"].dropna().astype(str).unique().tolist()) if "Vessel Name" in vessels_for_db.columns else []
 
     if not vessel_options:
         vessel_name = st.text_input("Vessel Name (no entry in sheet, type manually):")
@@ -82,12 +82,21 @@ if check_password():
         vessel_name = st.selectbox("Vessel Name:", vessel_options)
 
     # --- Compute Requirement Date automatically (Asia/Jakarta GMT+7) ---
-    today_jkt = datetime.now(ZoneInfo("Asia/Jakarta")).date()
+    now_jkt = datetime.now(ZoneInfo("Asia/Jakarta"))
+    today_jkt = now_jkt.date()
+
     if urgent == "Urgent":
+        # Urgent stays as today (even if after 16:00)
         requirement_date = today_jkt
     else:
-        # Normal delivery -> today + 3 working days
-        requirement_date = add_working_days(today_jkt, 3)
+        # Normal delivery:
+        # - If current JKT time is before 16:00 -> start counting from today (3 working days)
+        # - If current JKT time is 16:00 or later -> start counting from tomorrow (effectively +4 working days)
+        if now_jkt.hour >= 16:
+            start_day = today_jkt + timedelta(days=1)
+        else:
+            start_day = today_jkt
+        requirement_date = add_working_days(start_day, 3)
 
     # show computed requirement date to user (read-only)
     st.info(f"Requirement Date (computed): **{requirement_date.strftime('%d/%m/%Y')}**")
