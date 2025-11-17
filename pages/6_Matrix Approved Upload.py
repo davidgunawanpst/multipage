@@ -14,7 +14,7 @@ SHEET_ID = "1ICIDY-69EvwZAY2EjdOhN8lCvWu4vRtjLVX1Y1-Nm4o"
 SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={requests.utils.requote_uri(SHEET_NAME)}"
 
-APP_SCRIPT_ID = "REPLACE_WITH_YOUR_APP_SCRIPT_ID"  # <<-- hardcode your Apps Script ID here
+APP_SCRIPT_ID = "AKfycbwQY-LXghRtpSG5aybBXG4Kxfzrqhq_QlDbrEm55yvkHCygugmGh7Hly4LaZNt_T-93fQ"  # <<-- hardcode your Apps Script ID here
 APP_SCRIPT_URL = f"https://script.google.com/macros/s/{APP_SCRIPT_ID}/exec"
 MAX_MB = 15  # fixed, not exposed in UI
 # ----------------------------------------
