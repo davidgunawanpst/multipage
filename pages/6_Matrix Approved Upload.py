@@ -126,7 +126,6 @@ if check_password():
     st.markdown("---")
 
     # --- File upload (single PDF, fixed 15 MB) ---
-    st.subheader(f"3) Upload PDF (single file — max {MAX_MB} MB)")
     uploaded = st.file_uploader("Choose a PDF file", type=["pdf"], accept_multiple_files=False)
     valid_bytes = None
     if uploaded is not None:
