@@ -18,7 +18,7 @@ except Exception:
 # -----------------------
 # CONFIG (edit as needed)
 # -----------------------
-APPS_SCRIPT_URL = "PUT_YOUR_APPS_SCRIPT_URL_HERE"  # <- replace with your Apps Script URL
+APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbx-m6hojDmiDQpzH5jr1Ulk_JndkQfGBYTjoH9zTTNsgx0tp5k0LWegfSrQlwvVmnJC/exec"  # <- replace with your Apps Script URL
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 SHEET_NAME = "List All Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
