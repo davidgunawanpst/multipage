@@ -234,7 +234,10 @@ if "matrix_number" not in st.session_state:
     st.session_state.matrix_number = None
 
 st.write("Generate Nomor Matrix")
-matrix_generated = st.session_state.matrix_number
+if moda == "Handcarry":
+    st.session_state.matric_number = "Handcarry"
+else:
+    matrix_generated = st.session_state.matrix_number
 
 if st.button("Generate Matrix Number"):
     try:
