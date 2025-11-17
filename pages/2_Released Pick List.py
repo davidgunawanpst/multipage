@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from io import StringIO
 from auth import check_password  # your auth module
@@ -25,7 +25,7 @@ pic_list = [
     "Abim Priambada",
     "Maftuh Ikhsan",
     "Rifka Fahrul Musthofa",
-    "Rudi Haryanto",
+    "Rudi Haryanto",
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
 
@@ -49,6 +49,19 @@ def valid_number(value: str) -> bool:
         return False
     return value.strip().isdigit()
 
+def add_working_days(start: date, add_days: int) -> date:
+    """Add working days (Mon-Fri) to a date — weekends skipped."""
+    if add_days <= 0:
+        return start
+    current = start
+    days_added = 0
+    while days_added < add_days:
+        current += timedelta(days=1)
+        # weekday(): Monday==0 ... Sunday==6
+        if current.weekday() < 5:  # Mon-Fri
+            days_added += 1
+    return current
+
 # --- APP ---
 if check_password():
     st.title("Released Pick List")
@@ -68,12 +81,16 @@ if check_password():
     else:
         vessel_name = st.selectbox("Vessel Name:", vessel_options)
 
+    # --- Compute Requirement Date automatically (Asia/Jakarta GMT+7) ---
     today_jkt = datetime.now(ZoneInfo("Asia/Jakarta")).date()
-    requirement_date = st.date_input(
-        "Requirement Date (click calendar):",
-        value=today_jkt,
-        help="Pick the required date (click the calendar icon)."
-    )
+    if urgent == "Urgent":
+        requirement_date = today_jkt
+    else:
+        # Normal delivery -> today + 3 working days
+        requirement_date = add_working_days(today_jkt, 3)
+
+    # show computed requirement date to user (read-only)
+    st.info(f"Requirement Date (computed): **{requirement_date.strftime('%d/%m/%Y')}**")
 
     # --- Normal Flow ---
     if release_type == "Normal":
@@ -133,7 +150,7 @@ if check_password():
                     "remarks": remarks.strip(),
                     "input_date": input_date_str,
                     "requirement_date": req_date_str,
-                    "urgent_status":urgent
+                    "urgent_status": urgent
                 }
 
             # --- Send to Webhook ---
