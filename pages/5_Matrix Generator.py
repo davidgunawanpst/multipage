@@ -67,6 +67,7 @@ SEQ_WIDTH = 3
 def load_sheet_csv(url: str) -> pd.DataFrame:
     resp = requests.get(url, timeout=20)
     resp.raise_for_status()
+    # Force object dtype to avoid pandas coercion which can drop/transform mixed string values
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
 
@@ -156,7 +157,6 @@ selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_
 # Improved extraction: handles multiple delimiters, multiple picklists per cell, and includes alphanumeric/string picklists
 DELIMITERS_REGEX = r"[|;,/\\\n]+"
 
-
 def extract_picklist_candidates_from_row(r):
     """Return a list of candidate picklist strings extracted from a row cell.
 
@@ -164,6 +164,7 @@ def extract_picklist_candidates_from_row(r):
     It also strips surrounding quotes and whitespace.
     """
     candidate_text = None
+    # try multiple common column names (case-sensitive matching of header names from sheet after reading)
     for colname in ["Pick List", "Pick List NO.", "Picklist", "Picklist No.", "Concat"]:
         if colname in r and pd.notna(r[colname]) and str(r[colname]).strip() != "":
             candidate_text = str(r[colname]).strip()
@@ -172,7 +173,7 @@ def extract_picklist_candidates_from_row(r):
     if not candidate_text:
         return []
 
-    # If concat-like and contains '|', prefer splitting on delimiters anyway
+    # Split on multiple possible delimiters
     parts = re.split(DELIMITERS_REGEX, candidate_text)
     cleaned = []
     for p in parts:
