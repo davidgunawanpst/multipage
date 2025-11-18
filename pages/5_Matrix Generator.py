@@ -150,14 +150,14 @@ try:
     df_filtered = df_all.loc[mask].copy()
 
     # --- DEBUG TABLE A ---
-st.subheader("A. Rows with non-empty Actual Finish Packing")
-finish_nonempty = df['Actual Finish Packing'].notna() & (df['Actual Finish Packing'].astype(str).str.strip() != "")
-st.dataframe(df[finish_nonempty])
-
-# --- DEBUG TABLE B ---
-st.subheader("B. Rows with empty Tanggal Matrix")
-tanggal_empty = df['Tanggal Matrix'].isna() | (df['Tanggal Matrix'].astype(str).str.strip() == "")
-st.dataframe(df[tanggal_empty])
+    st.subheader("A. Rows with non-empty Actual Finish Packing")
+    finish_nonempty = df['Actual Finish Packing'].notna() & (df['Actual Finish Packing'].astype(str).str.strip() != "")
+    st.dataframe(df[finish_nonempty])
+    
+    # --- DEBUG TABLE B ---
+    st.subheader("B. Rows with empty Tanggal Matrix")
+    tanggal_empty = df['Tanggal Matrix'].isna() | (df['Tanggal Matrix'].astype(str).str.strip() == "")
+    st.dataframe(df[tanggal_empty])
 
     if selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
         df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip() == selected_db]
