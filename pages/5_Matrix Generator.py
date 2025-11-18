@@ -10,43 +10,27 @@ import re
 # ----------------------
 # Configuration (public sheets)
 # ----------------------
-# main sheet (List Finish Packing)
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
-# sheet for picklist source
 LIST_ALL_PACKING_SHEET = "List All Packing"
 LIST_ALL_PACKING_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(LIST_ALL_PACKING_SHEET)}"
 
-# matrix numbering sheet (public) — PENOMORAN-MATRIX (Sheet A)
 MATRIX_SHEET_ID = "1ICIDY-69EvwZAY2EjdOhN8lCvWu4vRtjLVX1Y1-Nm4o"
 MATRIX_SHEET_NAME = "PENOMORAN MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
-# matrix numbering sheet 2 (public) — PENOMORAN MATRIX STREAMLIT (Sheet B)
 MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
-# webhook URL
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
-# static lists
-ADMIN_PICS = [
-    "Abim Priambada",
-    "Maftuh Ikhsan",
-    "Fahrul",
-    "Rudi Haryanto",
-]
-
+ADMIN_PICS = ["Abim Priambada", "Maftuh Ikhsan", "Fahrul", "Rudi Haryanto"]
 DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
-
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
-
-# activity options requested
 ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 
-# mapping for PIC -> short name used in matrix
 PIC_SHORTNAME = {
     "Abim Priambada": "ABIM",
     "Maftuh Ikhsan": "MAFTUH",
@@ -54,10 +38,7 @@ PIC_SHORTNAME = {
     "Rudi Haryanto": "RUDI",
 }
 
-# expected columns to map (case-insensitive)
 EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
-
-# fixed sequence width
 SEQ_WIDTH = 3
 
 # ----------------------
@@ -67,9 +48,7 @@ SEQ_WIDTH = 3
 def load_sheet_csv(url: str) -> pd.DataFrame:
     resp = requests.get(url, timeout=20)
     resp.raise_for_status()
-    # Force object dtype to avoid pandas coercion which can drop/transform mixed string values
     return pd.read_csv(StringIO(resp.text), dtype=object)
-
 
 def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     sep = "&" if "?" in url else "?"
@@ -78,7 +57,6 @@ def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
-
 def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
@@ -86,12 +64,11 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     vessels = subset["Vessel"].dropna().astype(str).str.strip().unique().tolist()
     return sorted([v for v in vessels if v != ""])
 
-# ----------------------
-# Matrix numbering (simple count + 1)
-# ----------------------
-_ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI",
-          7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII"}
 
+# ----------------------
+# Matrix numbering
+# ----------------------
+_ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
 def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity, use_date=None, seq_width=3):
     if use_date is None:
@@ -99,25 +76,21 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
-    # Count in Sheet A
     pic_col_a = next((c for c in df_matrix_a.columns if c.strip().lower() == "pic"), None)
     count_a = df_matrix_a[pic_col_a].astype(str).str.strip().eq(pic).sum() if pic_col_a else 0
 
-    # Count in Sheet B
     pic_col_b = next((c for c in df_matrix_b.columns if c.strip().lower() == "pic"), None)
     count_b = df_matrix_b[pic_col_b].astype(str).str.strip().eq(pic).sum() if pic_col_b else 0
 
-    # Total sequence
     next_seq = int(count_a + count_b + 1)
     seq_str = str(next_seq).zfill(seq_width)
 
-    # PIC short name
     pic_short = PIC_SHORTNAME.get(pic, pic.replace(" ", ""))
 
-    # Token
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
     return f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
+
 
 # ----------------------
 # Streamlit UI
@@ -125,7 +98,6 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
 st.set_page_config(page_title="Matrix Generator", layout="wide")
 st.title("Matrix Generator — Pick Lists & Numbering")
 
-# Load main sheet
 with st.spinner("Loading main sheet..."):
     try:
         df_main = load_sheet_csv(CSV_URL)
@@ -133,149 +105,91 @@ with st.spinner("Loading main sheet..."):
         st.error(f"Failed to load main sheet: {e}")
         st.stop()
 
-# Map expected columns case-insensitively
 cols_map = {exp: c for c in df_main.columns for exp in EXPECTED_COLS if c.strip().lower() == exp.lower()}
 df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-# Ensure object dtype
 for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
-# Inputs
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 selected_activity = st.selectbox("Activity", ACTIVITY_OPTIONS)
 
-# Vessel multiselect
 vessel_options = get_vessels_for_db(df, selected_db) if selected_db != "-- Select DB --" else []
 selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_options)
 
 # ----------------------
-# Picklists from "List All Packing" with Finish Packing set & Tanggal Matrix empty
+# STRICT PICKLIST EXTRACTION — ONLY "Pick List NO."
 # ----------------------
-# Improved extraction: handles multiple delimiters, multiple picklists per cell, and includes alphanumeric/string picklists
 DELIMITERS_REGEX = r"[|;,/\\\n]+"
-
-def extract_picklist_candidates_from_row(r):
-    """Return a list of candidate picklist strings extracted from a row cell.
-
-    This function tries common column names and will split multi-values using common delimiters.
-    It also strips surrounding quotes and whitespace.
-    """
-    candidate_text = None
-    # try multiple common column names (case-sensitive matching of header names from sheet after reading)
-    for colname in ["Pick List", "Pick List NO.", "Picklist", "Picklist No.", "Concat"]:
-        if colname in r and pd.notna(r[colname]) and str(r[colname]).strip() != "":
-            candidate_text = str(r[colname]).strip()
-            break
-
-    if not candidate_text:
-        return []
-
-    # Split on multiple possible delimiters
-    parts = re.split(DELIMITERS_REGEX, candidate_text)
-    cleaned = []
-    for p in parts:
-        if not p:
-            continue
-        p = p.strip().strip('"').strip("'")
-        if p == "":
-            continue
-        cleaned.append(p)
-    return cleaned
+PICKLIST_COL = "Pick List NO."
 
 try:
     df_all = load_sheet_csv(LIST_ALL_PACKING_CSV)
 
-    # detect columns (case-insensitive)
-    finish_col = None
-    tanggal_col = None
-    for c in df_all.columns:
-        cl = c.strip().lower()
-        if cl == "actual finish packing":
-            finish_col = c
-        elif cl == "tanggal matrix":
-            tanggal_col = c
+    finish_nonempty = df_all["Actual Finish Packing"].astype(str).str.strip() != ""
+    tanggal_empty = df_all["Tanggal Matrix"].astype(str).str.strip() == ""
 
-    # Build mask: Finish Packing not empty AND Tanggal Matrix empty
-    if finish_col is not None:
-        finish_nonempty = df_all[finish_col].astype(object).fillna("").astype(str).str.strip() != ""
-    else:
-        finish_nonempty = pd.Series([False] * len(df_all))
+    df_filtered = df_all.loc[finish_nonempty & tanggal_empty].copy()
 
-    if tanggal_col is not None:
-        tanggal_empty = df_all[tanggal_col].astype(object).fillna("").astype(str).str.strip() == ""
-    else:
-        tanggal_empty = pd.Series([True] * len(df_all))  # treat as empty if column missing
+    if selected_db != "-- Select DB --":
+        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip().str.upper() == selected_db.upper()]
 
-    mask = finish_nonempty & tanggal_empty
-    df_filtered = df_all.loc[mask].copy()
-
-    # Optional: filter by selected DB (case-insensitive)
-    if selected_db and selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip().str.upper() == selected_db.strip().upper()]
-
-    # Optional: filter by selected vessels
-    if selected_vessels and "Vessel" in df_filtered.columns:
+    if selected_vessels:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
 
-    # Extract picklist candidates (now handles multiple picklists per cell)
     picks_raw = []
-    for _, row in df_filtered.iterrows():
-        candidates = extract_picklist_candidates_from_row(row)
-        if candidates:
-            # if parts exist, extend picks_raw
-            picks_raw.extend(candidates)
+    for val in df_filtered[PICKLIST_COL].fillna("").astype(str):
+        val = val.strip()
+        if not val:
+            continue
 
-    # Normalize and dedupe preserving first-seen order
+        parts = re.split(DELIMITERS_REGEX, val)
+        for p in parts:
+            p = p.strip().strip('"').strip("'")
+            if p:
+                picks_raw.append(p)
+
     seen = set()
     picklist_candidates = []
     for p in picks_raw:
-        p_norm = str(p).strip()
-        if p_norm not in seen:
-            seen.add(p_norm)
-            picklist_candidates.append(p_norm)
+        if p not in seen:
+            seen.add(p)
+            picklist_candidates.append(p)
 
-    # Separate numeric-only (pure digits) from others, but include both
-    numeric_exact = [x for x in picklist_candidates if re.fullmatch(r"\d+", x)]
-    non_numeric = [x for x in picklist_candidates if x not in numeric_exact]
+    numeric = [x for x in picklist_candidates if x.isdigit()]
+    non_numeric = [x for x in picklist_candidates if not x.isdigit()]
+    numeric_sorted = sorted(numeric, key=lambda z: int(z))
 
-    # Sort numeric by integer value, keep non-numeric in original order
-    numeric_sorted = sorted(numeric_exact, key=lambda s: int(s))
     picklist_options = numeric_sorted + non_numeric
 
-except Exception as ex:
-    st.warning(f"Could not load List All Packing for picklists: {ex}")
+except Exception as e:
+    st.warning(f"Picklist load error: {e}")
     picklist_options = []
 
 selected_picklists = st.multiselect("Pick List (choose one or more)", options=picklist_options)
 
-# Tujuan & Moda
 tujuan = st.text_input("Tujuan")
-moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
+moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --" + ""] + MODA_OPTIONS)
 
 st.divider()
 
-# MATRIX GENERATOR
 if "matrix_number" not in st.session_state:
     st.session_state.matrix_number = None
 
 st.write("Generate Nomor Matrix")
+
 if moda == "Handcarry":
-    st.session_state.matric_number = "Handcarry"
-else:
-    matrix_generated = st.session_state.matrix_number
+    st.session_state.matrix_number = "Handcarry"
 
 if st.button("Generate Matrix Number"):
-    # → Handcarry shortcut
     if moda == "Handcarry":
         st.session_state.matrix_number = "Handcarry"
         st.success("Generated: Handcarry")
         st.code("Handcarry")
     else:
         try:
-            # --- FETCH FRESH MATRIX SHEETS ON DEMAND ---
             df_matrix_a = load_sheet_csv_fresh(MATRIX_CSV_URL)
             df_matrix_b = load_sheet_csv_fresh(MATRIX2_CSV_URL)
 
@@ -283,25 +197,30 @@ if st.button("Generate Matrix Number"):
             use_date = datetime.combine(today_dt.date(), datetime.min.time())
 
             matrix_number = next_matrix_number_countif_multi(
-                df_matrix_a, df_matrix_b,
+                df_matrix_a,
+                df_matrix_b,
                 pic=selected_pic,
-                db=selected_db if selected_db and selected_db != "-- Select DB --" else "UNKNOWN",
+                db=selected_db if selected_db != "-- Select DB --" else "UNKNOWN",
                 activity=selected_activity,
                 use_date=use_date,
                 seq_width=SEQ_WIDTH,
             )
+
             st.session_state.matrix_number = matrix_number
             st.success("Generated: " + matrix_number)
             st.code(matrix_number)
+
         except Exception as e:
-            st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
-# Commit / Send button
+            st.error(f"Failed to generate matrix number: {e}")
+
+# ----------------------
+# Commit
+# ----------------------
 st.write("Commit Nomor Matrix dan Rencana Pengiriman")
 if st.button("Commit"):
     if not st.session_state.matrix_number:
         st.error("Please generate a Matrix Number first.")
     else:
-        # basic validation (same as before)
         errors = []
         if selected_db in ("", "-- Select DB --"):
             errors.append("Please select DB.")
@@ -317,10 +236,9 @@ if st.button("Commit"):
         if errors:
             st.error("Validation failed:\n- " + "\n- ".join(errors))
         else:
-            # build payload
             payload = {
                 "NOMOR MATRIX": st.session_state.matrix_number,
-                "MATRIX DATE": datetime.now().strftime("%Y-%m-%d"),  # formatted as date
+                "MATRIX DATE": datetime.now().strftime("%Y-%m-%d"),
                 "DATABASE": selected_db,
                 "Pick List No.": ";".join(selected_picklists),
                 "PIC": selected_pic,
@@ -329,16 +247,14 @@ if st.button("Commit"):
                 "Moda Pengiriman": moda,
                 "Tujuan Pengiriman": tujuan,
             }
+
             st.json(payload)
 
-            # send to Apps Script
             try:
                 response = requests.post(WEBHOOK_URL, json=payload, timeout=20)
                 if response.status_code == 200:
                     st.success(f"Committed successfully: {response.status_code}")
-                    st.info(f"Payload sent to Apps Script: {WEBHOOK_URL}")
-                    # optionally clear matrix number after successful commit
-                    # st.session_state.matrix_number = None
+                    st.info(f"Payload sent to Apps Script.")
                 else:
                     st.error(f"Failed to commit. Status code: {response.status_code}")
             except Exception as e:
