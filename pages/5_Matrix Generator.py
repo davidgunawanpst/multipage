@@ -108,7 +108,7 @@ with st.spinner("Loading main sheet..."):
 cols_map = {exp: c for c in df_main.columns for exp in EXPECTED_COLS if c.strip().lower() == exp.lower()}
 df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-for col in ["Database", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
+for col in ["Database", "Pick List NO.", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
