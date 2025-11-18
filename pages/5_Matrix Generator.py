@@ -5,6 +5,7 @@ from io import StringIO
 from urllib.parse import quote_plus
 from datetime import datetime
 import time
+import re
 
 # ----------------------
 # Configuration (public sheets)
@@ -68,6 +69,7 @@ def load_sheet_csv(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
+
 def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     sep = "&" if "?" in url else "?"
     url_fresh = f"{url}{sep}_={int(time.time() * 1000)}"
@@ -75,10 +77,11 @@ def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
+
 def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
-    subset = df[df["DB"].astype(str).str.strip() == selected_db]
+    subset = df[df["DB"].astype(str).str.strip().str.upper() == str(selected_db).strip().upper()]
     vessels = subset["Vessel"].dropna().astype(str).str.strip().unique().tolist()
     return sorted([v for v in vessels if v != ""])
 
@@ -87,6 +90,7 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
 # ----------------------
 _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI",
           7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII"}
+
 
 def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity, use_date=None, seq_width=3):
     if use_date is None:
@@ -149,12 +153,36 @@ selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_
 # ----------------------
 # Picklists from "List All Packing" with Finish Packing set & Tanggal Matrix empty
 # ----------------------
+# Improved extraction: handles multiple delimiters, multiple picklists per cell, and includes alphanumeric/string picklists
+DELIMITERS_REGEX = r"[|;,/\\\n]+"
+
+
 def extract_picklist_candidates_from_row(r):
-    # try common columns in order
+    """Return a list of candidate picklist strings extracted from a row cell.
+
+    This function tries common column names and will split multi-values using common delimiters.
+    It also strips surrounding quotes and whitespace.
+    """
+    candidate_text = None
     for colname in ["Pick List", "Pick List NO.", "Picklist", "Picklist No.", "Concat"]:
         if colname in r and pd.notna(r[colname]) and str(r[colname]).strip() != "":
-            return str(r[colname]).strip()
-    return None
+            candidate_text = str(r[colname]).strip()
+            break
+
+    if not candidate_text:
+        return []
+
+    # If concat-like and contains '|', prefer splitting on delimiters anyway
+    parts = re.split(DELIMITERS_REGEX, candidate_text)
+    cleaned = []
+    for p in parts:
+        if not p:
+            continue
+        p = p.strip().strip('"').strip("'")
+        if p == "":
+            continue
+        cleaned.append(p)
+    return cleaned
 
 try:
     df_all = load_sheet_csv(LIST_ALL_PACKING_CSV)
@@ -183,38 +211,37 @@ try:
     mask = finish_nonempty & tanggal_empty
     df_filtered = df_all.loc[mask].copy()
 
-    # Optional: filter by selected DB
+    # Optional: filter by selected DB (case-insensitive)
     if selected_db and selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
-        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip() == selected_db]
+        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip().str.upper() == selected_db.strip().upper()]
 
     # Optional: filter by selected vessels
     if selected_vessels and "Vessel" in df_filtered.columns:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
 
-    # Extract picklist candidates
+    # Extract picklist candidates (now handles multiple picklists per cell)
     picks_raw = []
     for _, row in df_filtered.iterrows():
-        candidate = extract_picklist_candidates_from_row(row)
-        if candidate:
-            # if concat-like value, prefer last part after '|'
-            if "|" in candidate:
-                parts = [p.strip() for p in candidate.split("|") if p and p.strip() != ""]
-                if parts:
-                    candidate = parts[-1]
-            picks_raw.append(candidate)
+        candidates = extract_picklist_candidates_from_row(row)
+        if candidates:
+            # if parts exist, extend picks_raw
+            picks_raw.extend(candidates)
 
-    # Dedupe preserving order
+    # Normalize and dedupe preserving first-seen order
     seen = set()
     picklist_candidates = []
     for p in picks_raw:
-        if p not in seen:
-            seen.add(p)
-            picklist_candidates.append(p)
+        p_norm = str(p).strip()
+        if p_norm not in seen:
+            seen.add(p_norm)
+            picklist_candidates.append(p_norm)
 
-    # Numeric-first sorting
-    numeric = [x for x in picklist_candidates if str(x).isdigit()]
-    non_numeric = [x for x in picklist_candidates if not str(x).isdigit()]
-    numeric_sorted = sorted(numeric, key=lambda s: int(s))
+    # Separate numeric-only (pure digits) from others, but include both
+    numeric_exact = [x for x in picklist_candidates if re.fullmatch(r"\d+", x)]
+    non_numeric = [x for x in picklist_candidates if x not in numeric_exact]
+
+    # Sort numeric by integer value, keep non-numeric in original order
+    numeric_sorted = sorted(numeric_exact, key=lambda s: int(s))
     picklist_options = numeric_sorted + non_numeric
 
 except Exception as ex:
