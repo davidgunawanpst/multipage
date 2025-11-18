@@ -18,12 +18,12 @@ CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:cs
 LIST_ALL_PACKING_SHEET = "List All Packing"
 LIST_ALL_PACKING_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(LIST_ALL_PACKING_SHEET)}"
 
-# matrix numbering sheet (public) — PENOMORAN-MATRIX (Sheet A)
+# matrix numbering sheet (public)
 MATRIX_SHEET_ID = "1ICIDY-69EvwZAY2EjdOhN8lCvWu4vRtjLVX1Y1-Nm4o"
 MATRIX_SHEET_NAME = "PENOMORAN MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
-# matrix numbering sheet 2 (public) — PENOMORAN MATRIX STREAMLIT (Sheet B)
+# matrix numbering sheet 2
 MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
@@ -31,21 +31,11 @@ MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gvi
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
 # static lists
-ADMIN_PICS = [
-    "Abim Priambada",
-    "Maftuh Ikhsan",
-    "Fahrul",
-    "Rudi Haryanto",
-]
-
+ADMIN_PICS = ["Abim Priambada","Maftuh Ikhsan","Fahrul","Rudi Haryanto"]
 DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
-
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
-
-# activity options requested
 ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 
-# mapping for PIC -> short name used in matrix
 PIC_SHORTNAME = {
     "Abim Priambada": "ABIM",
     "Maftuh Ikhsan": "MAFTUH",
@@ -53,10 +43,7 @@ PIC_SHORTNAME = {
     "Rudi Haryanto": "RUDI",
 }
 
-# expected columns to map (case-insensitive)
 EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
-
-# fixed sequence width
 SEQ_WIDTH = 3
 
 # ----------------------
@@ -94,20 +81,16 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
-    # Count in Sheet A
     pic_col_a = next((c for c in df_matrix_a.columns if c.strip().lower() == "pic"), None)
     count_a = df_matrix_a[pic_col_a].astype(str).str.strip().eq(pic).sum() if pic_col_a else 0
 
-    # Count in Sheet B
     pic_col_b = next((c for c in df_matrix_b.columns if c.strip().lower() == "pic"), None)
     count_b = df_matrix_b[pic_col_b].astype(str).str.strip().eq(pic).sum() if pic_col_b else 0
 
-    # Total sequence
     next_seq = int(count_a + count_b + 1)
     seq_str = str(next_seq).zfill(seq_width)
 
     pic_short = PIC_SHORTNAME.get(pic, pic.replace(" ", ""))
-
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
     return f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
@@ -118,7 +101,6 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
 st.set_page_config(page_title="Matrix Generator", layout="wide")
 st.title("Matrix Generator — Pick Lists & Numbering")
 
-# Load main sheet
 with st.spinner("Loading main sheet..."):
     try:
         df_main = load_sheet_csv(CSV_URL)
@@ -126,23 +108,19 @@ with st.spinner("Loading main sheet..."):
         st.error(f"Failed to load main sheet: {e}")
         st.stop()
 
-# Map expected columns
 cols_map = {exp: c for c in df_main.columns for exp in EXPECTED_COLS if c.strip().lower() == exp.lower()}
 df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-# Ensure object dtype
-for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
+for col in ["DB","Pick List","Vessel","Concat","PIC","Timestamp","Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
-# Inputs
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
 selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 selected_activity = st.selectbox("Activity", ACTIVITY_OPTIONS)
 
-# Vessel multiselect
 vessel_options = get_vessels_for_db(df, selected_db) if selected_db != "-- Select DB --" else []
-selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_options)
+selected_vessels = st.multiselect("Vessel (choose one or more)", vessel_options)
 
 # ----------------------
 # Picklists from List All Packing
@@ -178,7 +156,7 @@ try:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
 
     # ------------------------
-    # FIXED PICKLIST EXTRACTION
+    # OPTION B PATCH
     # ------------------------
     all_items = []
 
@@ -187,14 +165,12 @@ try:
         if not raw:
             continue
 
-        # replace separators with comma
         cleaned = (
             raw.replace("|", ",")
                .replace(";", ",")
                .replace("\n", ",")
         )
 
-        # split and add all individual elements
         for part in cleaned.split(","):
             part = part.strip()
             if part:
@@ -208,9 +184,17 @@ try:
             seen.add(item)
             picklist_candidates.append(item)
 
-    # numeric first, then strings
-    numeric = [x for x in picklist_candidates if x.isdigit()]
-    words = [x for x in picklist_candidates if not x.isdigit()]
+    # numeric detection BUT strings allowed
+    numeric = []
+    words = []
+
+    for x in picklist_candidates:
+        # numeric-only (digit)
+        if x.isdigit():
+            numeric.append(x)
+        else:
+            words.append(x)
+
     numeric_sorted = sorted(numeric, key=int)
 
     picklist_options = numeric_sorted + words
@@ -219,7 +203,7 @@ except Exception as ex:
     st.warning(f"Could not load List All Packing for picklists: {ex}")
     picklist_options = []
 
-selected_picklists = st.multiselect("Pick List (choose one or more)", options=picklist_options)
+selected_picklists = st.multiselect("Pick List (choose one or more)", picklist_options)
 
 # Tujuan & Moda
 tujuan = st.text_input("Tujuan")
