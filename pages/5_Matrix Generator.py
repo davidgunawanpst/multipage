@@ -9,28 +9,22 @@ import time
 # ----------------------
 # Configuration (public sheets)
 # ----------------------
-# main sheet (List Finish Packing)
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
-# sheet for picklist source
 LIST_ALL_PACKING_SHEET = "List All Packing"
 LIST_ALL_PACKING_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(LIST_ALL_PACKING_SHEET)}"
 
-# matrix numbering sheet (public)
 MATRIX_SHEET_ID = "1ICIDY-69EvwZAY2EjdOhN8lCvWu4vRtjLVX1Y1-Nm4o"
 MATRIX_SHEET_NAME = "PENOMORAN MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
-# matrix numbering sheet 2
 MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
-# webhook URL
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
-# static lists
 ADMIN_PICS = ["Abim Priambada","Maftuh Ikhsan","Fahrul","Rudi Haryanto"]
 DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
@@ -47,7 +41,7 @@ EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Co
 SEQ_WIDTH = 3
 
 # ----------------------
-# Utilities
+# UTILITIES
 # ----------------------
 @st.cache_data(ttl=300)
 def load_sheet_csv(url: str) -> pd.DataFrame:
@@ -69,8 +63,53 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
     vessels = subset["Vessel"].dropna().astype(str).str.strip().unique().tolist()
     return sorted([v for v in vessels if v != ""])
 
+
 # ----------------------
-# Matrix numbering
+# UNIQUE CODE EXTRACTION FUNCTIONS (YOUR LOGIC)
+# ----------------------
+def extract_from_unique_code(unique_code_value):
+    if unique_code_value is None:
+        return None
+    try:
+        if pd.isna(unique_code_value):
+            return None
+    except Exception:
+        pass
+    s = str(unique_code_value).strip()
+    if not s:
+        return None
+    if '|' in s:
+        parts = [p.strip() for p in s.split('|') if p.strip()]
+        if parts:
+            return parts[-1]
+    tokens = [t.strip() for t in s.replace('/', ' ').split() if t.strip()]
+    if tokens:
+        return tokens[-1]
+    return s or None
+
+
+def clean_candidate(val):
+    if val is None:
+        return None
+    try:
+        if pd.isna(val):
+            return None
+    except Exception:
+        pass
+    if isinstance(val, float):
+        if val.is_integer():
+            return str(int(val))
+        return str(val).strip()
+    if isinstance(val, int):
+        return str(val)
+    s = str(val).strip()
+    if s.lower() in {"", "nan", "none", "na"}:
+        return None
+    return s
+
+
+# ----------------------
+# MATRIX NUMBERING
 # ----------------------
 _ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI",
           7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII"}
@@ -95,8 +134,9 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
 
     return f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
 
+
 # ----------------------
-# Streamlit UI
+# STREAMLIT UI
 # ----------------------
 st.set_page_config(page_title="Matrix Generator", layout="wide")
 st.title("Matrix Generator — Pick Lists & Numbering")
@@ -123,31 +163,32 @@ vessel_options = get_vessels_for_db(df, selected_db) if selected_db != "-- Selec
 selected_vessels = st.multiselect("Vessel (choose one or more)", vessel_options)
 
 # ----------------------
-# Picklists from List All Packing
+# PICKLIST EXTRACTION (NOW USING UNIQUE CODE FALLBACK)
 # ----------------------
-def extract_picklist_candidates_from_row(r):
+def extract_picklist_candidates_from_row(row):
+    # 1) Normal fields
     for colname in ["Pick List", "Pick List NO.", "Picklist", "Picklist No.", "Concat"]:
-        if colname in r and pd.notna(r[colname]) and str(r[colname]).strip() != "":
-            return str(r[colname]).strip()
+        if colname in row and pd.notna(row[colname]) and str(row[colname]).strip() != "":
+            return str(row[colname]).strip()
+
+    # 2) Unique code fallback
+    if "Unique Code" in row.index:
+        extracted = extract_from_unique_code(row["Unique Code"])
+        cleaned = clean_candidate(extracted)
+        return cleaned
+
     return None
+
 
 try:
     df_all = load_sheet_csv(LIST_ALL_PACKING_CSV)
 
-    finish_col = None
-    tanggal_col = None
-    for c in df_all.columns:
-        cl = c.strip().lower()
-        if cl == "actual finish packing":
-            finish_col = c
-        elif cl == "tanggal matrix":
-            tanggal_col = c
+    finish_col = next((c for c in df_all.columns if c.strip().lower()=="actual finish packing"), None)
+    tanggal_col = next((c for c in df_all.columns if c.strip().lower()=="tanggal matrix"), None)
 
     finish_nonempty = df_all[finish_col].astype(str).str.strip() != "" if finish_col else pd.Series([False]*len(df_all))
-    tanggal_empty = df_all[tanggal_col].astype(str).str.strip() == "" if tanggal_col else pd.Series([True]*len(df_all))
 
-    mask = finish_nonempty
-    df_filtered = df_all.loc[mask].copy()
+    df_filtered = df_all.loc[finish_nonempty].copy()
 
     if selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
         df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip() == selected_db]
@@ -155,9 +196,6 @@ try:
     if selected_vessels and "Vessel" in df_filtered.columns:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
 
-    # ------------------------
-    # OPTION B PATCH
-    # ------------------------
     all_items = []
 
     for _, row in df_filtered.iterrows():
@@ -166,17 +204,18 @@ try:
             continue
 
         cleaned = (
-            raw.replace("|", ",")
-               .replace(";", ",")
-               .replace("\n", ",")
+            str(raw)
+            .replace("|", ",")
+            .replace(";", ",")
+            .replace("\n", ",")
         )
 
         for part in cleaned.split(","):
-            part = part.strip()
+            part = clean_candidate(part)
             if part:
                 all_items.append(part)
 
-    # dedupe while keeping order
+    # Dedupe
     seen = set()
     picklist_candidates = []
     for item in all_items:
@@ -184,19 +223,11 @@ try:
             seen.add(item)
             picklist_candidates.append(item)
 
-    # numeric detection BUT strings allowed
-    numeric = []
-    words = []
-
-    for x in picklist_candidates:
-        # numeric-only (digit)
-        if x.isdigit():
-            numeric.append(x)
-        else:
-            words.append(x)
+    # separate numeric and text
+    numeric = [x for x in picklist_candidates if x.isdigit()]
+    words = [x for x in picklist_candidates if not x.isdigit()]
 
     numeric_sorted = sorted(numeric, key=int)
-
     picklist_options = numeric_sorted + words
 
 except Exception as ex:
