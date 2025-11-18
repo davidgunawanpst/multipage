@@ -5,32 +5,47 @@ from io import StringIO
 from urllib.parse import quote_plus
 from datetime import datetime
 import time
-import re
 
 # ----------------------
 # Configuration (public sheets)
 # ----------------------
+# main sheet (List Finish Packing)
 SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
 WORKSHEET_NAME = "List Finish Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(WORKSHEET_NAME)}"
 
+# sheet for picklist source
 LIST_ALL_PACKING_SHEET = "List All Packing"
 LIST_ALL_PACKING_CSV = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(LIST_ALL_PACKING_SHEET)}"
 
+# matrix numbering sheet (public) — PENOMORAN-MATRIX (Sheet A)
 MATRIX_SHEET_ID = "1ICIDY-69EvwZAY2EjdOhN8lCvWu4vRtjLVX1Y1-Nm4o"
 MATRIX_SHEET_NAME = "PENOMORAN MATRIX"
 MATRIX_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX_SHEET_NAME)}"
 
+# matrix numbering sheet 2 (public) — PENOMORAN MATRIX STREAMLIT (Sheet B)
 MATRIX2_SHEET_NAME = "PENOMORAN MATRIX STREAMLIT"
 MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={quote_plus(MATRIX2_SHEET_NAME)}"
 
+# webhook URL
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
-ADMIN_PICS = ["Abim Priambada", "Maftuh Ikhsan", "Fahrul", "Rudi Haryanto"]
-Database_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
+# static lists
+ADMIN_PICS = [
+    "Abim Priambada",
+    "Maftuh Ikhsan",
+    "Fahrul",
+    "Rudi Haryanto",
+]
+
+DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
+
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
+
+# activity options requested
 ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 
+# mapping for PIC -> short name used in matrix
 PIC_SHORTNAME = {
     "Abim Priambada": "ABIM",
     "Maftuh Ikhsan": "MAFTUH",
@@ -38,7 +53,10 @@ PIC_SHORTNAME = {
     "Rudi Haryanto": "RUDI",
 }
 
-EXPECTED_COLS = ["Database", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
+# expected columns to map (case-insensitive)
+EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
+
+# fixed sequence width
 SEQ_WIDTH = 3
 
 # ----------------------
@@ -57,31 +75,34 @@ def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
-def get_vessels_for_Database(df: pd.DataFrame, selected_Database: str) -> list:
-    if "Database" not in df.columns or "Vessel" not in df.columns:
+def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
+    if "DB" not in df.columns or "Vessel" not in df.columns:
         return []
-    subset = df[df["Database"].astype(str).str.strip().str.upper() == str(selected_Database).strip().upper()]
+    subset = df[df["DB"].astype(str).str.strip() == selected_db]
     vessels = subset["Vessel"].dropna().astype(str).str.strip().unique().tolist()
     return sorted([v for v in vessels if v != ""])
-
 
 # ----------------------
 # Matrix numbering
 # ----------------------
-_ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
+_ROMAN = {1: "I", 2: "II", 3: "III", 4: "IV", 5: "V", 6: "VI",
+          7: "VII", 8: "VIII", 9: "IX", 10: "X", 11: "XI", 12: "XII"}
 
-def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, Database, activity, use_date=None, seq_width=3):
+def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity, use_date=None, seq_width=3):
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
     year = use_date.year
 
+    # Count in Sheet A
     pic_col_a = next((c for c in df_matrix_a.columns if c.strip().lower() == "pic"), None)
     count_a = df_matrix_a[pic_col_a].astype(str).str.strip().eq(pic).sum() if pic_col_a else 0
 
+    # Count in Sheet B
     pic_col_b = next((c for c in df_matrix_b.columns if c.strip().lower() == "pic"), None)
     count_b = df_matrix_b[pic_col_b].astype(str).str.strip().eq(pic).sum() if pic_col_b else 0
 
+    # Total sequence
     next_seq = int(count_a + count_b + 1)
     seq_str = str(next_seq).zfill(seq_width)
 
@@ -89,8 +110,7 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, Database, ac
 
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
-    return f"MATRIX - {seq_str}-{token}-{pic_short}-{Database}-{month_rom}-{year}"
-
+    return f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
 
 # ----------------------
 # Streamlit UI
@@ -98,6 +118,7 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, Database, ac
 st.set_page_config(page_title="Matrix Generator", layout="wide")
 st.title("Matrix Generator — Pick Lists & Numbering")
 
+# Load main sheet
 with st.spinner("Loading main sheet..."):
     try:
         df_main = load_sheet_csv(CSV_URL)
@@ -105,83 +126,118 @@ with st.spinner("Loading main sheet..."):
         st.error(f"Failed to load main sheet: {e}")
         st.stop()
 
+# Map expected columns
 cols_map = {exp: c for c in df_main.columns for exp in EXPECTED_COLS if c.strip().lower() == exp.lower()}
 df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-for col in ["Database", "Pick List NO.", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
+# Ensure object dtype
+for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
+# Inputs
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
-selected_Database = st.selectbox("Database", ["-- Select Database --"] + Database_LIST)
+selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
 selected_activity = st.selectbox("Activity", ACTIVITY_OPTIONS)
 
-vessel_options = get_vessels_for_Database(df, selected_Database) if selected_Database != "-- Select Database --" else []
+# Vessel multiselect
+vessel_options = get_vessels_for_db(df, selected_db) if selected_db != "-- Select DB --" else []
 selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_options)
 
 # ----------------------
-# STRICT PICKLIST EXTRACTION — ONLY "Pick List NO."
+# Picklists from List All Packing
 # ----------------------
-DELIMITERS_REGEX = r"[|;,/\\\n]+"
-PICKLIST_COL = "Pick List NO."
+def extract_picklist_candidates_from_row(r):
+    for colname in ["Pick List", "Pick List NO.", "Picklist", "Picklist No.", "Concat"]:
+        if colname in r and pd.notna(r[colname]) and str(r[colname]).strip() != "":
+            return str(r[colname]).strip()
+    return None
 
 try:
     df_all = load_sheet_csv(LIST_ALL_PACKING_CSV)
 
-    finish_nonempty = df_all["Actual Finish Packing"].astype(str).str.strip() != ""
-    tanggal_empty = df_all["Tanggal Actual Matrix"].astype(str).str.strip() == ""
+    finish_col = None
+    tanggal_col = None
+    for c in df_all.columns:
+        cl = c.strip().lower()
+        if cl == "actual finish packing":
+            finish_col = c
+        elif cl == "tanggal matrix":
+            tanggal_col = c
 
-    df_filtered = df_all.loc[finish_nonempty & tanggal_empty].copy()
+    finish_nonempty = df_all[finish_col].astype(str).str.strip() != "" if finish_col else pd.Series([False]*len(df_all))
+    tanggal_empty = df_all[tanggal_col].astype(str).str.strip() == "" if tanggal_col else pd.Series([True]*len(df_all))
 
-    if selected_Database != "-- Select Database --":
-        df_filtered = df_filtered[df_filtered["Database"].astype(str).str.strip().str.upper() == selected_Database.upper()]
+    mask = finish_nonempty & tanggal_empty
+    df_filtered = df_all.loc[mask].copy()
 
-    if selected_vessels:
+    if selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
+        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip() == selected_db]
+
+    if selected_vessels and "Vessel" in df_filtered.columns:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
 
-    picks_raw = []
-    for val in df_filtered[PICKLIST_COL].fillna("").astype(str):
-        val = val.strip()
-        if not val:
+    # ------------------------
+    # FIXED PICKLIST EXTRACTION
+    # ------------------------
+    all_items = []
+
+    for _, row in df_filtered.iterrows():
+        raw = extract_picklist_candidates_from_row(row)
+        if not raw:
             continue
 
-        parts = re.split(DELIMITERS_REGEX, val)
-        for p in parts:
-            p = p.strip().strip('"').strip("'")
-            if p:
-                picks_raw.append(p)
+        # replace separators with comma
+        cleaned = (
+            raw.replace("|", ",")
+               .replace(";", ",")
+               .replace("\n", ",")
+        )
 
+        # split and add all individual elements
+        for part in cleaned.split(","):
+            part = part.strip()
+            if part:
+                all_items.append(part)
+
+    # dedupe while keeping order
     seen = set()
     picklist_candidates = []
-    for p in picks_raw:
-        if p not in seen:
-            seen.add(p)
-            picklist_candidates.append(p)
+    for item in all_items:
+        if item not in seen:
+            seen.add(item)
+            picklist_candidates.append(item)
 
+    # numeric first, then strings
     numeric = [x for x in picklist_candidates if x.isdigit()]
-    non_numeric = [x for x in picklist_candidates if not x.isdigit()]
-    numeric_sorted = sorted(numeric, key=lambda z: int(z))
+    words = [x for x in picklist_candidates if not x.isdigit()]
+    numeric_sorted = sorted(numeric, key=int)
 
-    picklist_options = numeric_sorted + non_numeric
+    picklist_options = numeric_sorted + words
 
-except Exception as e:
-    st.warning(f"Picklist load error: {e}")
+except Exception as ex:
+    st.warning(f"Could not load List All Packing for picklists: {ex}")
     picklist_options = []
 
 selected_picklists = st.multiselect("Pick List (choose one or more)", options=picklist_options)
 
+# Tujuan & Moda
 tujuan = st.text_input("Tujuan")
-moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --" + ""] + MODA_OPTIONS)
+moda = st.selectbox("Moda Pengiriman", ["-- Select Moda --"] + MODA_OPTIONS)
 
 st.divider()
 
+# ----------------------
+# MATRIX GENERATOR
+# ----------------------
 if "matrix_number" not in st.session_state:
     st.session_state.matrix_number = None
 
 st.write("Generate Nomor Matrix")
-
 if moda == "Handcarry":
-    st.session_state.matrix_number = "Handcarry"
+    st.session_state.matric_number = "Handcarry"
+else:
+    matrix_generated = st.session_state.matrix_number
 
 if st.button("Generate Matrix Number"):
     if moda == "Handcarry":
@@ -197,24 +253,21 @@ if st.button("Generate Matrix Number"):
             use_date = datetime.combine(today_dt.date(), datetime.min.time())
 
             matrix_number = next_matrix_number_countif_multi(
-                df_matrix_a,
-                df_matrix_b,
+                df_matrix_a, df_matrix_b,
                 pic=selected_pic,
-                Database=selected_Database if selected_Database != "-- Select Database --" else "UNKNOWN",
+                db=selected_db if selected_db != "-- Select DB --" else "UNKNOWN",
                 activity=selected_activity,
                 use_date=use_date,
                 seq_width=SEQ_WIDTH,
             )
-
             st.session_state.matrix_number = matrix_number
             st.success("Generated: " + matrix_number)
             st.code(matrix_number)
-
         except Exception as e:
-            st.error(f"Failed to generate matrix number: {e}")
+            st.error(f"Failed to generate matrix number (fetching fresh data): {e}")
 
 # ----------------------
-# Commit
+# COMMIT DATA
 # ----------------------
 st.write("Commit Nomor Matrix dan Rencana Pengiriman")
 if st.button("Commit"):
@@ -222,8 +275,8 @@ if st.button("Commit"):
         st.error("Please generate a Matrix Number first.")
     else:
         errors = []
-        if selected_Database in ("", "-- Select Database --"):
-            errors.append("Please select Database.")
+        if selected_db in ("", "-- Select DB --"):
+            errors.append("Please select DB.")
         if not selected_vessels:
             errors.append("Please select at least one Vessel.")
         if not selected_picklists:
@@ -239,7 +292,7 @@ if st.button("Commit"):
             payload = {
                 "NOMOR MATRIX": st.session_state.matrix_number,
                 "MATRIX DATE": datetime.now().strftime("%Y-%m-%d"),
-                "DATABASE": selected_Database,
+                "DATABASE": selected_db,
                 "Pick List No.": ";".join(selected_picklists),
                 "PIC": selected_pic,
                 "ACTIVITY": selected_activity.upper(),
@@ -254,7 +307,7 @@ if st.button("Commit"):
                 response = requests.post(WEBHOOK_URL, json=payload, timeout=20)
                 if response.status_code == 200:
                     st.success(f"Committed successfully: {response.status_code}")
-                    st.info(f"Payload sent to Apps Script.")
+                    st.info(f"Payload sent to Apps Script: {WEBHOOK_URL}")
                 else:
                     st.error(f"Failed to commit. Status code: {response.status_code}")
             except Exception as e:
