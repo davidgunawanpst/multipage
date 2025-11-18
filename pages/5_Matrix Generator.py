@@ -164,7 +164,7 @@ try:
     tanggal_col = None
     for c in df_all.columns:
         cl = c.strip().lower()
-        if cl == "finish packing":
+        if cl == "actual finish packing":
             finish_col = c
         elif cl == "tanggal matrix":
             tanggal_col = c
