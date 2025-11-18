@@ -146,7 +146,7 @@ try:
     finish_nonempty = df_all[finish_col].astype(str).str.strip() != "" if finish_col else pd.Series([False]*len(df_all))
     tanggal_empty = df_all[tanggal_col].astype(str).str.strip() == "" if tanggal_col else pd.Series([True]*len(df_all))
 
-    mask = finish_nonempty & tanggal_empty
+    mask = finish_nonempty
     df_filtered = df_all.loc[mask].copy()
 
     if selected_db != "-- Select DB --" and "DB" in df_filtered.columns:
