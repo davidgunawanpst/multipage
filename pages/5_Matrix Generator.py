@@ -162,7 +162,7 @@ try:
         cl = c.strip().lower()
         if cl == "actual finish packing":
             finish_col = c
-        elif cl == "tanggal actual matrix":
+        elif cl == "tanggal matrix":
             tanggal_col = c
 
     finish_nonempty = df_all[finish_col].astype(str).str.strip() != "" if finish_col else pd.Series([False]*len(df_all))
