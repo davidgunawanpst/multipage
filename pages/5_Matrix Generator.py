@@ -129,7 +129,7 @@ try:
     df_all = load_sheet_csv(LIST_ALL_PACKING_CSV)
 
     finish_nonempty = df_all["Actual Finish Packing"].astype(str).str.strip() != ""
-    tanggal_empty = df_all["Tanggal Matrix"].astype(str).str.strip() == ""
+    tanggal_empty = df_all["Tanggal Actual Matrix"].astype(str).str.strip() == ""
 
     df_filtered = df_all.loc[finish_nonempty & tanggal_empty].copy()
 
