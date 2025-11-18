@@ -27,7 +27,7 @@ MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gvi
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
 ADMIN_PICS = ["Abim Priambada", "Maftuh Ikhsan", "Fahrul", "Rudi Haryanto"]
-DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
+Database_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
 ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
 
@@ -38,7 +38,7 @@ PIC_SHORTNAME = {
     "Rudi Haryanto": "RUDI",
 }
 
-EXPECTED_COLS = ["DB", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
+EXPECTED_COLS = ["Database", "Pick List", "Timestamp", "PIC", "Urgency", "Vessel", "Concat"]
 SEQ_WIDTH = 3
 
 # ----------------------
@@ -57,10 +57,10 @@ def load_sheet_csv_fresh(url: str) -> pd.DataFrame:
     resp.raise_for_status()
     return pd.read_csv(StringIO(resp.text), dtype=object)
 
-def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
-    if "DB" not in df.columns or "Vessel" not in df.columns:
+def get_vessels_for_Database(df: pd.DataFrame, selected_Database: str) -> list:
+    if "Database" not in df.columns or "Vessel" not in df.columns:
         return []
-    subset = df[df["DB"].astype(str).str.strip().str.upper() == str(selected_db).strip().upper()]
+    subset = df[df["Database"].astype(str).str.strip().str.upper() == str(selected_Database).strip().upper()]
     vessels = subset["Vessel"].dropna().astype(str).str.strip().unique().tolist()
     return sorted([v for v in vessels if v != ""])
 
@@ -70,7 +70,7 @@ def get_vessels_for_db(df: pd.DataFrame, selected_db: str) -> list:
 # ----------------------
 _ROMAN = {1:"I",2:"II",3:"III",4:"IV",5:"V",6:"VI",7:"VII",8:"VIII",9:"IX",10:"X",11:"XI",12:"XII"}
 
-def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity, use_date=None, seq_width=3):
+def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, Database, activity, use_date=None, seq_width=3):
     if use_date is None:
         use_date = datetime.now()
     month_rom = _ROMAN.get(use_date.month, str(use_date.month))
@@ -89,7 +89,7 @@ def next_matrix_number_countif_multi(df_matrix_a, df_matrix_b, pic, db, activity
 
     token = "DEL" if str(activity).strip().lower() == "delivery" else "OTHER"
 
-    return f"MATRIX - {seq_str}-{token}-{pic_short}-{db}-{month_rom}-{year}"
+    return f"MATRIX - {seq_str}-{token}-{pic_short}-{Database}-{month_rom}-{year}"
 
 
 # ----------------------
@@ -108,15 +108,15 @@ with st.spinner("Loading main sheet..."):
 cols_map = {exp: c for c in df_main.columns for exp in EXPECTED_COLS if c.strip().lower() == exp.lower()}
 df = df_main.rename(columns={v: k for k, v in cols_map.items()})
 
-for col in ["DB", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
+for col in ["Database", "Pick List", "Vessel", "Concat", "PIC", "Timestamp", "Urgency"]:
     if col in df.columns:
         df[col] = df[col].astype(object)
 
 selected_pic = st.selectbox("Select Admin PIC", ADMIN_PICS)
-selected_db = st.selectbox("DB", ["-- Select DB --"] + DB_LIST)
+selected_Database = st.selectbox("Database", ["-- Select Database --"] + Database_LIST)
 selected_activity = st.selectbox("Activity", ACTIVITY_OPTIONS)
 
-vessel_options = get_vessels_for_db(df, selected_db) if selected_db != "-- Select DB --" else []
+vessel_options = get_vessels_for_Database(df, selected_Database) if selected_Database != "-- Select Database --" else []
 selected_vessels = st.multiselect("Vessel (choose one or more)", options=vessel_options)
 
 # ----------------------
@@ -133,8 +133,8 @@ try:
 
     df_filtered = df_all.loc[finish_nonempty & tanggal_empty].copy()
 
-    if selected_db != "-- Select DB --":
-        df_filtered = df_filtered[df_filtered["DB"].astype(str).str.strip().str.upper() == selected_db.upper()]
+    if selected_Database != "-- Select Database --":
+        df_filtered = df_filtered[df_filtered["Database"].astype(str).str.strip().str.upper() == selected_Database.upper()]
 
     if selected_vessels:
         df_filtered = df_filtered[df_filtered["Vessel"].astype(str).str.strip().isin(selected_vessels)]
@@ -200,7 +200,7 @@ if st.button("Generate Matrix Number"):
                 df_matrix_a,
                 df_matrix_b,
                 pic=selected_pic,
-                db=selected_db if selected_db != "-- Select DB --" else "UNKNOWN",
+                Database=selected_Database if selected_Database != "-- Select Database --" else "UNKNOWN",
                 activity=selected_activity,
                 use_date=use_date,
                 seq_width=SEQ_WIDTH,
@@ -222,8 +222,8 @@ if st.button("Commit"):
         st.error("Please generate a Matrix Number first.")
     else:
         errors = []
-        if selected_db in ("", "-- Select DB --"):
-            errors.append("Please select DB.")
+        if selected_Database in ("", "-- Select Database --"):
+            errors.append("Please select Database.")
         if not selected_vessels:
             errors.append("Please select at least one Vessel.")
         if not selected_picklists:
@@ -239,7 +239,7 @@ if st.button("Commit"):
             payload = {
                 "NOMOR MATRIX": st.session_state.matrix_number,
                 "MATRIX DATE": datetime.now().strftime("%Y-%m-%d"),
-                "DATABASE": selected_db,
+                "DATABASE": selected_Database,
                 "Pick List No.": ";".join(selected_picklists),
                 "PIC": selected_pic,
                 "ACTIVITY": selected_activity.upper(),
