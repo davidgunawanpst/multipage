@@ -144,8 +144,8 @@ def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
 # UI
 # -----------------------
 if check_password():
-    st.set_page_config(page_title="Upload Photos (Actual Finish Packing)", layout="wide")
-    st.title("📸 Upload Photos — Actual Finish Packing")
+    st.set_page_config(page_title="Outbound", layout="wide")
+    st.title("Outbound")
 
     # 1) DB select
     selected_db = st.selectbox("Database (DB):", DB_LIST)
