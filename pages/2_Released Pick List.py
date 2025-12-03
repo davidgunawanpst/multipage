@@ -24,7 +24,7 @@ MANUAL_PICKLIST_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET
 pic_list = [
     "Abim Priambada",
     "Maftuh Ikhsan",
-    "Rifka Fahrul Musthofa",
+    "Junedi",
     "Rudi Haryanto",
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
