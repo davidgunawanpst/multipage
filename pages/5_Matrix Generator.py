@@ -25,7 +25,7 @@ MATRIX2_CSV_URL = f"https://docs.google.com/spreadsheets/d/{MATRIX_SHEET_ID}/gvi
 
 WEBHOOK_URL = "https://script.google.com/macros/s/AKfycbyCf9IGtpa8z3IQ0Nn7_3HE94812q4_iAzCWf8sRIXLIqhGGsp6F2Huf9gl76IBjrcn3g/exec"
 
-ADMIN_PICS = ["Abim Priambada","Maftuh Ikhsan","Fahrul","Rudi Haryanto"]
+ADMIN_PICS = ["Abim Priambada","Maftuh Ikhsan","Junedi","Rudi Haryanto"]
 DB_LIST = ["DMI", "PBN", "PKS", "PMT", "PSM", "PSS", "PST"]
 MODA_OPTIONS = ["Sea Freight", "Air Freight", "Land Freight", "Handcarry"]
 ACTIVITY_OPTIONS = ["APDP", "Petty Cash", "Delivery", "Scraps"]
