@@ -18,7 +18,7 @@ if files:
     }
 
     resp = requests.post(
-        "https://script.google.com/macros/s/AKfycbw6q9yMRziyb0D201owqgNkGHsdLoTLHtBV5JrDcuRdHsv4u-LumGncaWoD6rhDl8k3Ng/exec",
+        "https://script.google.com/macros/s/AKfycbx524Y0N1LMzk7bpfwpgyJb9NXvl7xuhaRvehhaTPXE9BfpyE5q8xGf7yGfFqjBtdkyZg/exec",
         json=payload,
     )
 
