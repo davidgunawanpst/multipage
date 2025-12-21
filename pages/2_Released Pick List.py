@@ -196,6 +196,7 @@ if check_password():
                     st.success("🎉 Submission completed successfully!")
                     st.json(data_payload)
                 else:
+                    st.json(resp.json())
                     st.error(f"❌ Data logging failed: {resp.status_code} - {resp.text}")
 
             except Exception as e:
