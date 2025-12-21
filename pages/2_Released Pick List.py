@@ -11,7 +11,7 @@ import base64
 st.set_page_config(page_title="Released Pick List", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwd_9dKDFp800o-kzXqgZHtF7XyW14xySSO5i3MqtviRQmQRZ7uzJXIcD8-srBPZP_y/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwjuzC8xEWmkr-MWkkiSUeJP1LB804VtBithfxuVotB94FNpPoDlMjr2cfBAFNygF6CfQ/exec"
 
 # --- GOOGLE SHEETS ---
 VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
