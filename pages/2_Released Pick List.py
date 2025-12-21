@@ -11,7 +11,7 @@ import base64
 st.set_page_config(page_title="Released Pick List", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwjuzC8xEWmkr-MWkkiSUeJP1LB804VtBithfxuVotB94FNpPoDlMjr2cfBAFNygF6CfQ/exec"
+WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbyfUGaOUcttzfNNghlpEKSPOVGS8jRez8B0I2ci50RsD5qUbgPELyVu8ElU-UVlJwkrig/exec"
 
 # --- GOOGLE SHEETS ---
 VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
@@ -153,9 +153,9 @@ if check_password():
 
             # --- Filename Creation ---
             if release_type == "Normal":
-                pdf_filename = f"PL-{selected_db}-{pick_number.strip()}.pdf"
+                filename = f"PL-{selected_db}-{pick_number.strip()}.pdf"
             else:
-                pdf_filename = f"PL-{selected_db}-{next_number}.pdf"
+                filename = f"PL-{selected_db}-{next_number}.pdf"
 
             # Payload Build
             if release_type == "Normal":
@@ -168,8 +168,8 @@ if check_password():
                     "input_date": input_date_str,
                     "requirement_date": req_date_str,
                     "urgent_status": urgent,
-                    "pdf_data": pdf_base64,
-                    "pdf_filename": pdf_filename
+                    "pdf": pdf_base64,
+                    "filename": filename
                 }
             else:
                 data_payload = {
@@ -183,8 +183,8 @@ if check_password():
                     "input_date": input_date_str,
                     "requirement_date": req_date_str,
                     "urgent_status": urgent,
-                    "pdf_data": pdf_base64,
-                    "pdf_filename": pdf_filename
+                    "pdf": pdf_base64,
+                    "filename": filename
                 }
 
             # --- Send to Webhook ---
