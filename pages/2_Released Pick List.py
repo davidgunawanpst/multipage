@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, date
 from zoneinfo import ZoneInfo
 from io import StringIO
 from auth import check_password  # your auth module
+import base64
 
 # --- PAGE CONFIG ---
 st.set_page_config(page_title="Released Pick List", layout="wide")
@@ -28,6 +29,7 @@ pic_list = [
     "Rudi Haryanto",
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
+
 
 # --- HELPERS ---
 @st.cache_data(ttl=600)
@@ -57,10 +59,10 @@ def add_working_days(start: date, add_days: int) -> date:
     days_added = 0
     while days_added < add_days:
         current += timedelta(days=1)
-        # weekday(): Monday==0 ... Sunday==6
-        if current.weekday() < 5:  # Mon-Fri
+        if current.weekday() < 5:
             days_added += 1
     return current
+
 
 # --- APP ---
 if check_password():
@@ -81,24 +83,19 @@ if check_password():
     else:
         vessel_name = st.selectbox("Vessel Name:", vessel_options)
 
-    # --- Compute Requirement Date automatically (Asia/Jakarta GMT+7) ---
+    # --- Requirement date logic ---
     now_jkt = datetime.now(ZoneInfo("Asia/Jakarta"))
     today_jkt = now_jkt.date()
 
     if urgent == "Urgent":
-        # Urgent stays as today (even if after 16:00)
         requirement_date = today_jkt
     else:
-        # Normal delivery:
-        # - If current JKT time is before 16:00 -> start counting from today (3 working days)
-        # - If current JKT time is 16:00 or later -> start counting from tomorrow (effectively +4 working days)
         if now_jkt.hour >= 16:
             start_day = today_jkt + timedelta(days=1)
         else:
             start_day = today_jkt
         requirement_date = add_working_days(start_day, 3)
 
-    # show computed requirement date to user (read-only)
     st.info(f"Requirement Date (computed): **{requirement_date.strftime('%d/%m/%Y')}**")
 
     # --- Normal Flow ---
@@ -123,20 +120,44 @@ if check_password():
 
         remarks = st.text_input("Remarks (e.g. Vendor - Barang):")
 
+    # --- PDF Upload ---
+    uploaded_pdf = st.file_uploader(
+        "Attach Picklist PDF (required)",
+        type=["pdf"],
+        accept_multiple_files=False
+    )
+
+    pdf_base64 = None
+
+    if uploaded_pdf is not None:
+        pdf_bytes = uploaded_pdf.read()
+        pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
+        st.success("📄 PDF attached ✔️")
+
+
     # --- Submit Button ---
     if st.button("✅ Submit"):
         input_date_str = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
         req_date_str = requirement_date.strftime("%d/%m/%Y")
 
-        # Basic validation
-        if not vessel_name or not vessel_name.strip():
+        # Validation
+        if not uploaded_pdf:
+            st.warning("Please upload a PDF file.")
+        elif not vessel_name or not vessel_name.strip():
             st.warning("Please select or enter a Vessel Name.")
         elif release_type == "Normal" and not valid_number(pick_number):
             st.warning("Nomor PL must contain digits only.")
         elif release_type == "Manual" and not remarks.strip():
             st.warning("Please fill in Remarks (Vendor - Barang).")
         else:
-            # --- Payload Build ---
+
+            # --- Filename Creation ---
+            if release_type == "Normal":
+                pdf_filename = f"PL-{selected_db}-{pick_number.strip()}.pdf"
+            else:
+                pdf_filename = f"PL-{selected_db}-{next_number}.pdf"
+
+            # Payload Build
             if release_type == "Normal":
                 data_payload = {
                     "release_type": "Normal",
@@ -146,7 +167,9 @@ if check_password():
                     "pic": selected_pic,
                     "input_date": input_date_str,
                     "requirement_date": req_date_str,
-                    "urgent_status": urgent
+                    "urgent_status": urgent,
+                    "pdf_data": pdf_base64,
+                    "pdf_filename": pdf_filename
                 }
             else:
                 data_payload = {
@@ -159,17 +182,21 @@ if check_password():
                     "remarks": remarks.strip(),
                     "input_date": input_date_str,
                     "requirement_date": req_date_str,
-                    "urgent_status": urgent
+                    "urgent_status": urgent,
+                    "pdf_data": pdf_base64,
+                    "pdf_filename": pdf_filename
                 }
 
             # --- Send to Webhook ---
             try:
                 with st.spinner("Sending data to server..."):
-                    resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=25)
+                    resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=40)
+
                 if resp.status_code in (200, 201):
                     st.success("🎉 Submission completed successfully!")
                     st.json(data_payload)
                 else:
                     st.error(f"❌ Data logging failed: {resp.status_code} - {resp.text}")
+
             except Exception as e:
                 st.error(f"❌ Network/error sending data: {e}")
