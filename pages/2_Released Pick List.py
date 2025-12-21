@@ -18,7 +18,7 @@ if files:
     }
 
     resp = requests.post(
-        "YOUR_WEBHOOK_URL",
+        "https://script.google.com/macros/s/AKfycbw6q9yMRziyb0D201owqgNkGHsdLoTLHtBV5JrDcuRdHsv4u-LumGncaWoD6rhDl8k3Ng/exec",
         json=payload,
     )
 
