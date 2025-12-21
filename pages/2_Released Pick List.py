@@ -1,3 +1,12 @@
+import streamlit as st
+import requests
+import pandas as pd
+from datetime import datetime, timedelta, date
+from zoneinfo import ZoneInfo
+from io import StringIO
+from auth import check_password  # your auth module
+import base64
+
 files = st.file_uploader("Upload PDF", type=["pdf"])
 if files:
     pdf_bytes = files.read()
@@ -14,3 +23,4 @@ if files:
     )
 
     st.json(resp.json())
+
