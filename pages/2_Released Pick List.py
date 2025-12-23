@@ -16,10 +16,14 @@ WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwZnOTknxXB_ZarbkcSh
 # --- GOOGLE SHEETS ---
 VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
 VESSEL_SHEET_NAME = "Vessel Name"
-VESSEL_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={VESSEL_SHEET_NAME}"
+VESSEL_CSV_URL = (
+    f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={VESSEL_SHEET_NAME}"
+)
 
 MANUAL_PICKLIST_SHEET_NAME = "Manual Pick List"
-MANUAL_PICKLIST_CSV_URL = f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={MANUAL_PICKLIST_SHEET_NAME}"
+MANUAL_PICKLIST_CSV_URL = (
+    f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={MANUAL_PICKLIST_SHEET_NAME}"
+)
 
 # --- STATIC LISTS ---
 pic_list = [
@@ -30,13 +34,18 @@ pic_list = [
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
 
+# --- SHARED HTTP SESSION ---
+@st.cache_resource
+def get_http_session() -> requests.Session:
+    return requests.Session()
 
 # --- HELPERS ---
 @st.cache_data(ttl=600)
 def load_csv(url: str) -> pd.DataFrame:
     """Generic CSV loader with safe fallback."""
     try:
-        resp = requests.get(url, timeout=15)
+        session = get_http_session()
+        resp = session.get(url, timeout=15)
         resp.raise_for_status()
         df = pd.read_csv(StringIO(resp.text))
         df.columns = df.columns.str.strip()
@@ -46,13 +55,11 @@ def load_csv(url: str) -> pd.DataFrame:
         return pd.DataFrame()
 
 def valid_number(value: str) -> bool:
-    """Check numeric input."""
     if not value:
         return False
     return value.strip().isdigit()
 
 def add_working_days(start: date, add_days: int) -> date:
-    """Add working days (Mon-Fri) to a date — weekends skipped."""
     if add_days <= 0:
         return start
     current = start
@@ -62,7 +69,6 @@ def add_working_days(start: date, add_days: int) -> date:
         if current.weekday() < 5:
             days_added += 1
     return current
-
 
 # --- APP ---
 if check_password():
@@ -75,8 +81,16 @@ if check_password():
 
     # --- Load Vessel Data ---
     df_vessel = load_csv(VESSEL_CSV_URL)
-    vessels_for_db = df_vessel[df_vessel["DB"].astype(str).str.strip() == selected_db] if not df_vessel.empty else pd.DataFrame()
-    vessel_options = sorted(vessels_for_db["Vessel Name"].dropna().astype(str).unique().tolist()) if "Vessel Name" in vessels_for_db.columns else []
+    vessels_for_db = (
+        df_vessel[df_vessel["DB"].astype(str).str.strip() == selected_db]
+        if not df_vessel.empty
+        else pd.DataFrame()
+    )
+    vessel_options = (
+        sorted(vessels_for_db["Vessel Name"].dropna().astype(str).unique().tolist())
+        if "Vessel Name" in vessels_for_db.columns
+        else []
+    )
 
     if not vessel_options:
         vessel_name = st.text_input("Vessel Name (no entry in sheet, type manually):")
@@ -90,10 +104,7 @@ if check_password():
     if urgent == "Urgent":
         requirement_date = today_jkt
     else:
-        if now_jkt.hour >= 16:
-            start_day = today_jkt + timedelta(days=1)
-        else:
-            start_day = today_jkt
+        start_day = today_jkt + timedelta(days=1) if now_jkt.hour >= 16 else today_jkt
         requirement_date = add_working_days(start_day, 3)
 
     st.info(f"Requirement Date (computed): **{requirement_date.strftime('%d/%m/%Y')}**")
@@ -117,7 +128,6 @@ if check_password():
 
         kode_picklist_manual = f"{selected_db}-Manual-{next_number}"
         st.write(f"🧾 **Generated Pick List Code:** {kode_picklist_manual}")
-
         remarks = st.text_input("Remarks (e.g. Vendor - Barang):")
 
     # --- PDF Upload ---
@@ -128,19 +138,16 @@ if check_password():
     )
 
     pdf_base64 = None
-
     if uploaded_pdf is not None:
         pdf_bytes = uploaded_pdf.read()
         pdf_base64 = base64.b64encode(pdf_bytes).decode("utf-8")
         st.success("📄 PDF attached ✔️")
-
 
     # --- Submit Button ---
     if st.button("✅ Submit"):
         input_date_str = datetime.now(ZoneInfo("Asia/Jakarta")).strftime("%d/%m/%Y")
         req_date_str = requirement_date.strftime("%d/%m/%Y")
 
-        # Validation
         if not uploaded_pdf:
             st.warning("Please upload a PDF file.")
         elif not vessel_name or not vessel_name.strip():
@@ -150,14 +157,12 @@ if check_password():
         elif release_type == "Manual" and not remarks.strip():
             st.warning("Please fill in Remarks (Vendor - Barang).")
         else:
+            filename = (
+                f"PL-{selected_db}-{pick_number.strip()}.pdf"
+                if release_type == "Normal"
+                else f"PL-{selected_db}-{next_number}.pdf"
+            )
 
-            # --- Filename Creation ---
-            if release_type == "Normal":
-                filename = f"PL-{selected_db}-{pick_number.strip()}.pdf"
-            else:
-                filename = f"PL-{selected_db}-{next_number}.pdf"
-
-            # Payload Build
             if release_type == "Normal":
                 data_payload = {
                     "release_type": "Normal",
@@ -169,7 +174,7 @@ if check_password():
                     "requirement_date": req_date_str,
                     "urgent_status": urgent,
                     "pdf": pdf_base64,
-                    "filename": filename
+                    "filename": filename,
                 }
             else:
                 data_payload = {
@@ -184,13 +189,17 @@ if check_password():
                     "requirement_date": req_date_str,
                     "urgent_status": urgent,
                     "pdf": pdf_base64,
-                    "filename": filename
+                    "filename": filename,
                 }
 
-            # --- Send to Webhook ---
             try:
                 with st.spinner("Sending data to server..."):
-                    resp = requests.post(WEBHOOK_URL_DATA, json=data_payload, timeout=40)
+                    session = get_http_session()
+                    resp = session.post(
+                        WEBHOOK_URL_DATA,
+                        json=data_payload,
+                        timeout=40
+                    )
 
                 if resp.status_code in (200, 201):
                     st.success("🎉 Submission completed successfully!")
