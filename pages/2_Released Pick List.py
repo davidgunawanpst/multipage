@@ -29,7 +29,7 @@ MANUAL_PICKLIST_CSV_URL = (
 pic_list = [
     "Abim Priambada",
     "Maftuh Ikhsan",
-    "Junedi",
+    "Dadi Mulyanto",
     "Rudi Haryanto",
 ]
 db_list = ["DMI", "PBN", "PKS", "PMT", "PSS", "PSM", "PST"]
