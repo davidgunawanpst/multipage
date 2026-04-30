@@ -10,12 +10,12 @@ from auth import check_password  # keep your auth
 st.set_page_config(page_title="Packing Start", layout="wide")
 
 # --- Google Sheet details ---
-SHEET_ID = "1YsSJSlezQHZKdY0P21Co7NxecPzrmYNCKMvbceYaLEo"
+SHEET_ID = st.secrets["PACKING_SHEET_ID"]
 SHEET_NAME = "List All Packing"
 CSV_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/gviz/tq?tqx=out:csv&sheet={SHEET_NAME}"
 
 # --- Your webhook URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwFSn6IwvFz_mIonmY5eIZqLK73QYytJHCad4tkua92QZcQbQEOCOpEeBBSeUTR-Wmqnw/exec"
+WEBHOOK_URL_DATA = st.secrets["PACKING_WEBHOOK"]
 
 # --- Static lists ---
 pic_list = [
