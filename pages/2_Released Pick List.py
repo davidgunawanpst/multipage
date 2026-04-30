@@ -11,10 +11,10 @@ import base64
 st.set_page_config(page_title="Released Pick List", layout="wide")
 
 # --- WEBHOOK URL ---
-WEBHOOK_URL_DATA = "https://script.google.com/macros/s/AKfycbwZnOTknxXB_ZarbkcShRR-l-V-pecwDk6oVXGghBV33S1XXDMMwCxMpT2n6MG7iq85pw/exec"
+WEBHOOK_URL_DATA = st.secrets("WEBHOOK_URL")
 
 # --- GOOGLE SHEETS ---
-VESSEL_SHEET_ID = "18rlYmNpArAvEZrD3yyy7iAFDpHvFqEvN7pvztb1VcVM"
+VESSEL_SHEET_ID = st.secrets("VESSEL_SHEET_ID")
 VESSEL_SHEET_NAME = "Vessel Name"
 VESSEL_CSV_URL = (
     f"https://docs.google.com/spreadsheets/d/{VESSEL_SHEET_ID}/gviz/tq?tqx=out:csv&sheet={VESSEL_SHEET_NAME}"
