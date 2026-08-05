@@ -126,17 +126,17 @@ def clean_candidate(val):
 def get_available_picks(df: pd.DataFrame, selected_db: str) -> list:
     df = df.copy()
     df.columns = df.columns.str.strip()
-    required = {"Database", "Pick List NO."}
+    required = {"DB", "Pick List Number"}
     if not required.issubset(set(df.columns)):
         missing = required - set(df.columns)
         raise ValueError(f"Sheet missing required columns: {missing}")
 
-    df["Database"] = df["Database"].astype(str).str.strip()
-    filtered = df[df["Database"] == selected_db].copy()
+    df["DB"] = df["DB"].astype(str).str.strip()
+    filtered = df[df["DB"] == selected_db].copy()
 
     picks = []
     for _, row in filtered.iterrows():
-        candidate = clean_candidate(row.get("Pick List NO.", None))
+        candidate = clean_candidate(row.get("Pick List Number", None))
         if candidate:
             picks.append(candidate)
 
@@ -246,7 +246,7 @@ if check_password():
             "timestamp": datetime.now(ZoneInfo("Asia/Jakarta")).isoformat(),
             "nomor_matrix": nomor_matrix.strip(),
             "nama_kapal": nama_kapal,
-            "database": selected_db,
+            "DB": selected_db,
             "pick_lists": pick_numbers,
             "tujuan": tujuan,
             "matrix_date": matrix_date.isoformat(),
